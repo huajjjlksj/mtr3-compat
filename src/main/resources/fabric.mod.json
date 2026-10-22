@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "mtr3compat",
+	"version": "${version}",
+	"name": "MTR3 Compat",
+	"description": "MTR4 兼容层：加载 MTR3 + NTE 资源包，提供 MTR3 式自动编组与 NTE JS 脚本引擎。",
+	"authors": [
+		"chenxin"
+	],
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.xm.mtr3compat.client.Mtr3CompatClient"
+		]
+	},
+	"mixins": [
+		{
+			"config": "mtr3compat.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.14.21",
+		"minecraft": "~1.20.1",
+		"java": ">=17",
+		"fabric-api": "*",
+		"mtr": ">=4.0.5",
+		"jcm": ">=2.2.0"
+	}
+}

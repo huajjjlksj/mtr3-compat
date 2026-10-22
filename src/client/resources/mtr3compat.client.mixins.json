@@ -1,0 +1,25 @@
+{
+	"required": true,
+	"package": "com.xm.mtr3compat.client.mixin",
+	"compatibilityLevel": "JAVA_17",
+	"mixins": [
+		"ClientDataSyncMixin",
+		"ConfigCaptureMixin",
+		"ConnStretchRenderMixin",
+		"ConfigScreenMixin",
+		"CustomResourceLoaderMixin",
+		"DoorDebugMixin",
+		"MtrScriptingReloadMixin",
+		"ModelPropertiesPartObjCopyMixin",
+		"RenderVehiclesDebugMixin",
+		"ResourceManagerHelperMixin",
+		"VehicleConfigCaptureMixin",
+		"VehicleScriptContextConnMixin",
+		"ScriptResourceUtilMixin",
+		"VehicleResourceMatchesConditionMixin",
+		"VehicleSelectorScreenMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
