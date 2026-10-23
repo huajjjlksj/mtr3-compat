@@ -15,6 +15,7 @@
 		"MatricesSetIdentityMixin",
 		"ModelPropertiesPartObjCopyMixin",
 		"RenderVehiclesDebugMixin",
+	"PersistentVehicleDataAccessor",
 		"RailCompatMixin",
 		"ParsedScriptTrainEntryMixin",
 		"RawModelSourceLocationMixin",

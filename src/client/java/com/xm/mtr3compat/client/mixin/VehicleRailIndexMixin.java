@@ -67,6 +67,20 @@ public class VehicleRailIndexMixin {
 		cir.setReturnValue(sync(vehicleExtension.getId(), cir.getReturnValue()));
 	}
 
+	/**
+	 * 脚本（conn.js 贯通道角度）必须与渲染管线用同一份进度：
+	 * MTR4 渲染按 smoothedRailProgress 摆放车厢，但 JCM 的 getRailProgress() 返回服务端原始值。
+	 * 行驶中原始值每次同步跳变、平滑值滞后收敛（≈1 秒），停站开门时平滑被冻结（adjustmentAmount=0），
+	 * 两者之差在曲线上表现为风挡随机左右大幅偏移、停站持续、启动后才恢复。
+	 */
+	@Inject(method = "getRailProgress()D", at = @At("HEAD"), cancellable = true)
+	private void mtr3compat$smoothedProgress(CallbackInfoReturnable<Double> cir) {
+		final double smoothed = ((PersistentVehicleDataAccessor) (Object) vehicleExtension.persistentVehicleData).mtr3compat$getSmoothedRailProgress();
+		if (smoothed != 0) {
+			cir.setReturnValue(smoothed);
+		}
+	}
+
 	@Inject(method = "getRailIndex", at = @At("HEAD"), cancellable = true)
 	private void mtr3compat$getRailIndex(double progress, boolean fromEnd, CallbackInfoReturnable<Integer> cir) {
 		final long id = vehicleExtension.getId();
