@@ -34,6 +34,9 @@ public abstract class VehicleResourceMatchesConditionMixin {
 		if (mtr3compat$nativeRender) {
 			// 渲染发生在资源重载之后，此时 JCM 的脚本表已就绪，补登原 id 别名（脚本部件如车轮才会渲染）
 			com.xm.mtr3compat.client.JcmScriptAlias.applyOnce();
+			// 进世界首帧脚本可能早于客户端 tick 的 DATA_CACHE 重建执行，
+			// 空表查 stationIdToConnectingStations 会抛 forEach of undefined 中断渲染（LCD 定格/不显示）。
+			com.xm.mtr3compat.client.MtrClientDataCompat.tickEnsureData();
 			final String logKey = mtr3compat$getId() + "#" + carNumber + "/" + totalCars;
 			if (mtr3compat$queueLogs.add(logKey)) {
 				com.xm.mtr3compat.client.Mtr3CompatClient.LOGGER.info("[mtr3compat] queue {} car={}/{} ray={} onRoute={} reversed={} doors={} cacheNull={}",
