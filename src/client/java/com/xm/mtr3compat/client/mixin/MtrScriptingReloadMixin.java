@@ -2,6 +2,7 @@ package com.xm.mtr3compat.client.mixin;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.lx862.mtrscripting.core.ScriptManager;
 import com.lx862.mtrscripting.lib.org.mozilla.javascript.NativeJavaClass;
