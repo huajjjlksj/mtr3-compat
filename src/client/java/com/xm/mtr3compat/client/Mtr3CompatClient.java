@@ -18,6 +18,9 @@ public class Mtr3CompatClient implements ClientModInitializer {
 	 */
 	public static volatile boolean SPOOF_MTR_VERSION = false;
 
+	/** 调试用：重喂窗口内把脚本里的空 catch 替换为一次性 print，暴露被吞掉的脚本异常（诊断完改回 false）。 */
+	public static final boolean DEBUG_INSTRUMENT_CATCH = true;
+
 	@Override
 	public void onInitializeClient() {
 		Mtr3CompatConfig.load();
