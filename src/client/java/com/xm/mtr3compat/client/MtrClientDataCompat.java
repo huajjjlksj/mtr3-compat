@@ -24,6 +24,7 @@ import org.mtr.mod.client.MinecraftClientData;
 import org.mtr.mod.packet.PacketRequestData;
 
 import java.lang.reflect.Field;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -79,8 +80,8 @@ public final class MtrClientDataCompat {
 		public volatile Map<Long, Depot> sidingIdToDepot = new HashMap<>();
 		/** Map<Long(routeId), Depot> */
 		public volatile Map<Long, Depot> routeIdToOneDepot = new HashMap<>();
-		/** Map<Station, Set<Station>> 键为 Station 实例（MTR3 语义） */
-		public volatile Map<Station, Set<Station>> stationIdToConnectingStations = new HashMap<>();
+		/** Map<Station, Set<Station>> 键为 Station 实例（MTR3 语义），miss 返回空集 */
+		public volatile Map<Station, Set<Station>> stationIdToConnectingStations = connectingMap();
 		/** Map<Long(stationId), Map<Integer(routeColor), RouteInterchange(color, name||前段)>> */
 		public volatile Map<Long, Map<Integer, VehicleWrapper.Stop.RouteInterchange>> stationIdToRoutes = new HashMap<>();
 		/** MTR4 无对应世界扫描缓存，给空表防止脚本 undefined 崩溃（德水包未使用） */
@@ -355,7 +356,20 @@ public final class MtrClientDataCompat {
 		}
 
 		final Map<Long, Map<Integer, VehicleWrapper.Stop.RouteInterchange>> stationIdToRoutes = new HashMap<>();
-		final Map<Station, Set<Station>> connecting = new HashMap<>();
+		// MTR3 语义：每个车站都有连接站条目（可为空集）。MTR4 增量同步下远处车站可能缺席，
+		// 查不到时返回空集，避免脚本对结果直接 forEach 抛 "undefined" 中断渲染。
+		final Map<Station, Set<Station>> connecting = new HashMap<Station, Set<Station>>() {
+			@Override
+			public Set<Station> get(Object key) {
+				final Set<Station> value = super.get(key);
+				return value != null ? value : Collections.emptySet();
+			}
+
+			@Override
+			public boolean containsKey(Object key) {
+				return true;
+			}
+		};
 
 		if (hasDataset) {
 			// 脚本里的 Stop.station/platform/siding 都是这个数据集的实例（VehicleDataCache.buildVehicleStopsData 直接取它），
