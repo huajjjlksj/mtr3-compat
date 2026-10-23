@@ -61,6 +61,21 @@ public class MtrScriptingReloadMixin {
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] ClassShutter 放开失败", e);
 		}
+		// 德水 nclcd draw.js 运行期用 java.lang.reflect.Array.newInstance 与 java.lang.Integer.TYPE，
+		// 被 JCM 默认 deny 的 java.lang.reflect.* / java.lang.Class 拦截（空 catch 吞掉后 LCD 空白）。
+		// 反射移除这两条 deny；Process/ProcessBuilder/ClassLoader/System 等危险类仍保持禁用。
+		try {
+			final java.lang.reflect.Field deniedField = com.lx862.mtrscripting.core.api.MTRClassShutter.class.getDeclaredField("deniedScriptClasses");
+			deniedField.setAccessible(true);
+			@SuppressWarnings("unchecked")
+			final java.util.List<com.lx862.mtrscripting.core.api.ClassRule> denied =
+					(java.util.List<com.lx862.mtrscripting.core.api.ClassRule>) deniedField.get(manager.getClassShutter());
+			final int before = denied.size();
+			denied.removeIf(rule -> rule.match("java.lang.reflect.Array") || rule.match("java.lang.Class"));
+			Mtr3CompatClient.LOGGER.info("[mtr3compat] ClassShutter deny 移除 {} 条（reflect/Class）", before - denied.size());
+		} catch (Exception e) {
+			Mtr3CompatClient.LOGGER.warn("[mtr3compat] ClassShutter deny 移除失败", e);
+		}
 		final TriConsumer<String, com.lx862.mtrscripting.lib.org.mozilla.javascript.Context, com.lx862.mtrscripting.lib.org.mozilla.javascript.Scriptable> override =
 				(name, ctx, scope) -> {
 					if (Mtr3CompatClient.SPOOF_MTR_VERSION) {
