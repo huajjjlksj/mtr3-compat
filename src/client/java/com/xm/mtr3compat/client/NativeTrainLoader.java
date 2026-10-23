@@ -35,8 +35,6 @@ public final class NativeTrainLoader {
 	private static final String[] VARIATION_SUFFIXES = {"_trailer", "_cab_1", "_cab_2", "_cab_3"};
 	private static final String[] LEGACY_GANGWAYS = {"a_train", "e44", "k_train_ael", "k_train", "k_train_tcl", "m_train", "r211", "s_train", "sp1900"};
 	private static final String[] LEGACY_BARRIERS = {"london_underground_d78", "mlr", "r179"};
-	/** MTR3 CustomResources 缺省风挡贴图（LegacyVehicleResource 回退 texture_id 是错的）。 */
-	private static final String DEFAULT_GANGWAY_ID = "mtr:textures/entity/sp1900";
 
 	private static final ObjectOpenHashSet<String> NATIVE_IDS = new ObjectOpenHashSet<>();
 	private static final ObjectArrayList<NativeEntry2> ENTRIES = new ObjectArrayList<>();
@@ -105,8 +103,15 @@ public final class NativeTrainLoader {
 		NATIVE_IDS.clear();
 		ENTRIES.clear();
 		JcmScriptAlias.invalidate();
+		// 只处理原版资源包管理器真正加载了的包：未启用的包贴图/脚本/JSON 一律读不到，
+		// 注册出来只会造成 "Script ... is missing" 与 null 配置报错。
+		final java.util.Set<String> loadedPacks = Mtr3CompatPacks.loadedPackNames();
 		for (final Path packPath : Mtr3CompatPacks.mtrPacks()) {
 			if (!Mtr3CompatConfig.isIntercepted(packPath.getFileName().toString())) {
+				continue;
+			}
+			if (!loadedPacks.contains(Mtr3CompatPacks.packBaseName(packPath))) {
+				Mtr3CompatClient.LOGGER.info("[mtr3compat] 跳过未启用的资源包: " + Mtr3CompatPacks.packBaseName(packPath));
 				continue;
 			}
 			final byte[] bytes = Mtr3CompatPacks.readPackFile(packPath, "assets/mtr/mtr_custom_resources.json");
@@ -236,7 +241,9 @@ public final class NativeTrainLoader {
 		// MTR3 语义：间距 = length(=props.length+1) + 0 + 0，车厢几何按槽位建模，禁止按变体位加 padding
 		baseObject.addProperty("couplingPadding1", 0);
 		baseObject.addProperty("couplingPadding2", 0);
-		final boolean hasGangway = !legacy.gangwayConnectionId().isEmpty() || legacy.hasGangwayConnection();
+		// MTR3：has_gangway_connection 只影响连通性，风挡贴图仅在 gangway_connection_id 非空时才绘制。
+		// 为空时 MTR4 若按 sp1900 回退绘制，就会在每个车缝多出一层“别人的风挡”。
+		final boolean hasGangway = !legacy.gangwayConnectionId().isEmpty();
 		baseObject.addProperty("hasGangway1", hasGangway);
 		baseObject.addProperty("hasGangway2", hasGangway);
 		baseObject.addProperty("hasBarrier1", !legacy.trainBarrierId().isEmpty());
@@ -258,6 +265,11 @@ public final class NativeTrainLoader {
 		final String[] modelSplit = splitWithEmptyStrings(legacy.model(), '|');
 		for (int j = 0; j < modelSplit.length; j += 2) {
 			final String[] conditions = j + 1 < modelSplit.length ? splitWithEmptyStrings(modelSplit[j + 1], ';') : new String[]{};
+			if (modelSplit[j].isEmpty()) {
+				// 纯脚本车型（无 model 字段、base_type 兜底后仍为空）：MTR 加载空名模型会反复报 "Invalid model!"，
+				// 且产出 null VehicleModel。车身本就由脚本 drawCarModel 绘制，这里直接跳过空模型条目。
+				continue;
+			}
 			if (conditions.length < 2 || matchesFilter(conditions[1].split(","), currentCar, totalCars) <= matchesFilter(conditions[0].split(","), currentCar, totalCars)) {
 				final JsonObject modelObject = new JsonObject();
 				modelObject.addProperty("modelResource", modelSplit[j]);
@@ -278,14 +290,19 @@ public final class NativeTrainLoader {
 
 		try {
 			processModel(legacy, currentCar, totalCars, isObj, reversed, propertiesObject.getAsJsonArray("parts"), positionDefinitionsArray, partsArray, doorMax);
-		} catch (Exception ignored) {
+		} catch (Exception e) {
+			Mtr3CompatClient.LOGGER.warn("[mtr3compat] processModel 失败: {} car={}/{}", id, currentCar, totalCars, e);
 		}
 
-		// Migrate legacy gangway & barriers（空 gangway_connection_id 按 MTR3 回退 sp1900，而非 texture_id）
+		// Migrate legacy gangway & barriers
+		// 注意：has_gangway_connection 只表示“车厢连通”，MTR3 在 gangway_connection_id 为空时
+		// 并不绘制风挡（西安包这类车由脚本自己画 FD 模型）。若按 sp1900 贴图回退，
+		// MTR4 会在每个车缝额外叠一层 sp1900 风挡，看起来像“别的车的风挡”。
 		final String barrierId = legacy.trainBarrierId();
 		String barrierBaseId = barrierId;
-		final String gangwayId = legacy.gangwayConnectionId().isEmpty() ? DEFAULT_GANGWAY_ID : legacy.gangwayConnectionId();
-		String gangwayConnectionBaseId = gangwayId + "_connector";
+		final String gangwayId = legacy.gangwayConnectionId();
+		final boolean hasVisibleGangway = !gangwayId.isEmpty();
+		String gangwayConnectionBaseId = hasVisibleGangway ? gangwayId + "_connector" : "";
 		if (gangwayId.startsWith("mtr:textures/entity") && Arrays.stream(LEGACY_GANGWAYS).anyMatch(oldId -> gangwayId.startsWith("mtr:textures/entity/" + oldId))) {
 			gangwayConnectionBaseId = gangwayConnectionBaseId
 					.replace("/entity", "/gangway")
@@ -299,16 +316,18 @@ public final class NativeTrainLoader {
 
 		final JsonObject modelPropertiesObject = new JsonObject();
 		modelPropertiesObject.addProperty("modelYOffset", 1);
-		modelPropertiesObject.addProperty("gangwayInnerSideResource", gangwayConnectionBaseId + "_side.png");
-		modelPropertiesObject.addProperty("gangwayInnerTopResource", gangwayConnectionBaseId + "_roof.png");
-		modelPropertiesObject.addProperty("gangwayInnerBottomResource", gangwayConnectionBaseId + "_floor.png");
-		modelPropertiesObject.addProperty("gangwayOuterSideResource", gangwayConnectionBaseId + "_exterior.png");
-		modelPropertiesObject.addProperty("gangwayOuterTopResource", gangwayConnectionBaseId + "_exterior.png");
-		modelPropertiesObject.addProperty("gangwayOuterBottomResource", gangwayConnectionBaseId + "_exterior.png");
-		modelPropertiesObject.addProperty("gangwayWidth", 1.5);
-		modelPropertiesObject.addProperty("gangwayHeight", 2.25);
-		modelPropertiesObject.addProperty("gangwayYOffset", 1);
-		modelPropertiesObject.addProperty("gangwayZOffset", 0.5);
+		if (hasVisibleGangway) {
+			modelPropertiesObject.addProperty("gangwayInnerSideResource", gangwayConnectionBaseId + "_side.png");
+			modelPropertiesObject.addProperty("gangwayInnerTopResource", gangwayConnectionBaseId + "_roof.png");
+			modelPropertiesObject.addProperty("gangwayInnerBottomResource", gangwayConnectionBaseId + "_floor.png");
+			modelPropertiesObject.addProperty("gangwayOuterSideResource", gangwayConnectionBaseId + "_exterior.png");
+			modelPropertiesObject.addProperty("gangwayOuterTopResource", gangwayConnectionBaseId + "_exterior.png");
+			modelPropertiesObject.addProperty("gangwayOuterBottomResource", gangwayConnectionBaseId + "_exterior.png");
+			modelPropertiesObject.addProperty("gangwayWidth", 1.5);
+			modelPropertiesObject.addProperty("gangwayHeight", 2.25);
+			modelPropertiesObject.addProperty("gangwayYOffset", 1);
+			modelPropertiesObject.addProperty("gangwayZOffset", 0.5);
+		}
 		modelPropertiesObject.addProperty("barrierInnerSideResource", barrierBaseId + "_exterior.png");
 		modelPropertiesObject.addProperty("barrierOuterSideResource", barrierBaseId + "_exterior.png");
 		modelPropertiesObject.addProperty("barrierWidth", 2.25);

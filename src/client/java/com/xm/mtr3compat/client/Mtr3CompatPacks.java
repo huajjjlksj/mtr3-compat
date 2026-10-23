@@ -1,6 +1,7 @@
 package com.xm.mtr3compat.client;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.server.packs.PackResources;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.io.ByteArrayOutputStream;
@@ -8,7 +9,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -98,5 +101,25 @@ public final class Mtr3CompatPacks {
 	public static String packBaseName(Path path) {
 		final String name = path.getFileName().toString();
 		return Mtr3CompatConfig.normalize(name);
+	}
+
+	/**
+	 * 当前由原版资源包管理器实际加载的 resourcepacks 目录包名（不含 .zip）。
+	 * 未启用的包不在这个集合里：它们的车虽然能从磁盘读到定义，但贴图/脚本/JSON 一律读不到，
+	 * 注册出来只会产生一堆 "Script ... is missing" 报错，所以调用方应直接跳过。
+	 */
+	public static Set<String> loadedPackNames() {
+		final Set<String> names = new HashSet<>();
+		final Minecraft client = Minecraft.getInstance();
+		if (client == null || client.getResourceManager() == null) {
+			return names;
+		}
+		for (final PackResources pack : client.getResourceManager().listPacks().toList()) {
+			final String id = pack.packId();
+			if (id.startsWith("file/")) {
+				names.add(Mtr3CompatConfig.normalize(id.substring("file/".length())));
+			}
+		}
+		return names;
 	}
 }

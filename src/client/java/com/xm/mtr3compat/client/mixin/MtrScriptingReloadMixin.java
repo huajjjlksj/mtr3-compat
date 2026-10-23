@@ -1,5 +1,6 @@
 package com.xm.mtr3compat.client.mixin;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.lx862.mtrscripting.core.ScriptManager;
@@ -19,6 +20,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 脚本接管：勾选包的 mtr_custom_resources.json 已被 readAllResources 过滤（JCM parseCustom 不再解析），
@@ -47,7 +50,13 @@ public class MtrScriptingReloadMixin {
 			manager.getClassShutter().allowClass(
 					com.lx862.mtrscripting.core.api.ClassRule.parse("net.minecraft.*"),
 					com.lx862.mtrscripting.core.api.ClassRule.parse("org.joml.*"),
-					com.lx862.mtrscripting.core.api.ClassRule.parse("com.mojang.*"));
+					com.lx862.mtrscripting.core.api.ClassRule.parse("com.mojang.*"),
+					// 兼容层自身（NativeJavaClass 绑定与返回值包装）
+					com.lx862.mtrscripting.core.api.ClassRule.parse("com.xm.mtr3compat.*"),
+					// ScriptVector3f 等 JCM 核心类型（不含 Rhino 内部）
+					com.lx862.mtrscripting.core.api.ClassRule.parse("com.lx862.mtrscripting.core.*"),
+					// org.mtr.mapping.holder/mapper、org.mtr.core/mod：API 参数与返回值
+					com.lx862.mtrscripting.core.api.ClassRule.parse("org.mtr.*"));
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] ClassShutter 放开失败", e);
 		}
@@ -92,9 +101,14 @@ public class MtrScriptingReloadMixin {
 				if (!root.isJsonObject()) {
 					continue;
 				}
-				MtrScriptingResourceManager.vehicle.parseMtrResources(root.getAsJsonObject(), root.getAsJsonObject().has("custom_trains"));
-				MtrScriptingResourceManager.eyecandy.parseMtrResources(root.getAsJsonObject(), root.getAsJsonObject().has("custom_eyecandy"));
-				MtrScriptingResourceManager.lift.parseMtrResources(root.getAsJsonObject(), root.getAsJsonObject().has("custom_lifts"));
+				final JsonObject rootObject = root.getAsJsonObject();
+				final int deduped = mtr3compat$dedupScripts(rootObject);
+				MtrScriptingResourceManager.vehicle.parseMtrResources(rootObject, rootObject.has("custom_trains"));
+				MtrScriptingResourceManager.eyecandy.parseMtrResources(rootObject, rootObject.has("custom_eyecandy"));
+				MtrScriptingResourceManager.lift.parseMtrResources(rootObject, rootObject.has("custom_lifts"));
+				if (deduped > 0) {
+					Mtr3CompatClient.LOGGER.info("[mtr3compat] 脚本去重: {} 个重复条目改为 script_id 引用（省 {} 次编译）", packName, deduped);
+				}
 			} catch (Exception e) {
 				Mtr3CompatClient.LOGGER.warn("[mtr3compat] 脚本重喂失败: " + packName, e);
 			}
@@ -102,5 +116,56 @@ public class MtrScriptingReloadMixin {
 		} finally {
 			Mtr3CompatClient.SPOOF_MTR_VERSION = false;
 		}
+	}
+
+	/**
+	 * 重喂前按 script_files（保持原始顺序）分组去重：每组仅保留首个条目完整脚本，
+	 * 其余条目改写为 script_id 引用。JCM legacy 分支对带 script_id 的条目只登记别名映射、
+	 * 不再重复编译，避免同一脚本链被逐条目完整编译（顶层含 display_helper 建网格、字体加载等重活）。
+	 * 仅影响传给 JCM 的副本；NativeTrainLoader 的原生注册读独立解析的原始 JSON，不受影响。
+	 */
+	private static int mtr3compat$dedupScripts(JsonObject rootObject) {
+		final JsonElement trainsElement = rootObject.get("custom_trains");
+		if (trainsElement == null || !trainsElement.isJsonObject()) {
+			return 0;
+		}
+		final JsonObject trains = trainsElement.getAsJsonObject();
+		final Map<String, String> firstByScript = new HashMap<>();
+		int deduped = 0;
+		for (final Map.Entry<String, JsonElement> entry : trains.entrySet()) {
+			if (!entry.getValue().isJsonObject()) {
+				continue;
+			}
+			final JsonObject vehicleObject = entry.getValue().getAsJsonObject();
+			if (vehicleObject.has("script_id")) {
+				continue;
+			}
+			final JsonElement scriptFiles = vehicleObject.get("script_files");
+			if (scriptFiles == null || !scriptFiles.isJsonArray()) {
+				continue;
+			}
+			final String key = mtr3compat$scriptKey(scriptFiles.getAsJsonArray());
+			if (key == null) {
+				continue;
+			}
+			final String canonical = firstByScript.putIfAbsent(key, entry.getKey());
+			if (canonical != null) {
+				vehicleObject.remove("script_files");
+				vehicleObject.addProperty("script_id", "mtr_custom_train_" + canonical);
+				deduped++;
+			}
+		}
+		return deduped;
+	}
+
+	private static String mtr3compat$scriptKey(JsonArray scriptFiles) {
+		final StringBuilder builder = new StringBuilder();
+		for (final JsonElement element : scriptFiles) {
+			if (!element.isJsonPrimitive()) {
+				return null;
+			}
+			builder.append(element.getAsString()).append('\n');
+		}
+		return builder.toString();
 	}
 }
