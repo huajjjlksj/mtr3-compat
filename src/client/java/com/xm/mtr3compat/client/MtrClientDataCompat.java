@@ -392,8 +392,10 @@ public final class MtrClientDataCompat {
 				}
 			}
 
-			// 每个车站都放一个条目（哪怕为空集）：脚本直接对查到的集合调用 forEach，缺失条目会抛 TypeError
-			for (final Station station : dataset.stations) {
+			// 每个车站都放一个条目（哪怕为空集）：脚本直接对查到的集合调用 forEach，缺失条目会抛 TypeError。
+			// 键必须用 stationIdMap 的规范实例：dataset.stations 里同一 id 可能有多个实例，
+			// 直接遍历 put 会让 HashMap（按 id 相等）只保留最后写入的键，脚本传入其它实例时 == 匹配不上。
+			for (final Station station : dataset.stationIdMap.values()) {
 				connecting.put(station, new HashSet<>());
 			}
 			dataset.connectingStationInterchangeMap.forEach((stationId, nameToInterchanges) -> {
@@ -434,6 +436,14 @@ public final class MtrClientDataCompat {
 					if (datasetStation != null) {
 						connecting.mirror(clientStation, connecting.get(datasetStation));
 					}
+				}
+			}
+			// dataset.stations 里的非规范重复实例（同 id 不同对象）也必须逐个镜像：
+			// 脚本的 == 是身份比较，任何一份实例都可能是 Stop.station 的来源。
+			for (final Station station : dataset.stations) {
+				final Station canonical = dataset.stationIdMap.get(station.getId());
+				if (canonical != null && station != canonical) {
+					connecting.mirror(station, connecting.get(canonical));
 				}
 			}
 		} else if (data != null) {
