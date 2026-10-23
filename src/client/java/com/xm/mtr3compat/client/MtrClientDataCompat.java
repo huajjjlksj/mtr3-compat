@@ -87,7 +87,7 @@ public final class MtrClientDataCompat {
 		public volatile Map<Station, Set<Station>> stationIdToConnectingStations = connectingMap();
 		/** Map<Long(stationId), Map<Integer(routeColor), RouteInterchange(color, name||前段)>> */
 		public volatile Map<Long, Map<Integer, VehicleWrapper.Stop.RouteInterchange>> stationIdToRoutes = new HashMap<>();
-		/** MTR4 无对应世界扫描缓存，给空表防止脚本 undefined 崩溃（德水包未使用） */
+		/** MTR4 无对应世界扫描缓存，给空表防止脚本 undefined 崩溃。 */
 		public final Map<Object, Station> blockPosToStation = new HashMap<>();
 		public final Map<Long, Long> blockPosToPlatformId = new HashMap<>();
 		public final Map<Long, Object> platformConnections = new HashMap<>();

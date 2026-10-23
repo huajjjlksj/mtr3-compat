@@ -22,6 +22,7 @@
 		"ResourceManagerHelperMixin",
 		"VehicleConfigCaptureMixin",
 		"VehicleScriptContextConnMixin",
+                "VehicleScriptCarSpaceShiftMixin",
 		"VehicleRailIndexMixin",
 		"VehicleRouteStopsMixin",
 		"VectorToStringMixin",

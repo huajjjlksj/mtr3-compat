@@ -38,6 +38,12 @@ public final class NativeTrainLoader {
 
 	private static final ObjectOpenHashSet<String> NATIVE_IDS = new ObjectOpenHashSet<>();
 	private static final ObjectArrayList<NativeEntry2> ENTRIES = new ObjectArrayList<>();
+	/** 原生注册的车型 id -> 来源资源包名（不含 .zip），供按包区分的渲染校正使用。 */
+	private static final java.util.HashMap<String, String> VEHICLE_PACK = new java.util.HashMap<>();
+
+	public static String packOf(String vehicleId) {
+		return VEHICLE_PACK.get(vehicleId);
+	}
 
 	/** 经启用中的资源包读取 OBJ/贴图/JSON（勾选包仍在原版正常启用，仅解析被拦截）。 */
 	private static final ResourceProvider RESOURCE_PROVIDER = new ResourceProvider() {
@@ -65,10 +71,12 @@ public final class NativeTrainLoader {
 
 	private static final class NativeEntry2 {
 		private final String id;
+		private final String pack;
 		private final JsonObject json;
 
-		private NativeEntry2(String id, JsonObject json) {
+		private NativeEntry2(String id, String pack, JsonObject json) {
 			this.id = id;
+			this.pack = pack;
 			this.json = json;
 		}
 	}
@@ -102,6 +110,7 @@ public final class NativeTrainLoader {
 	public static void scan() {
 		NATIVE_IDS.clear();
 		ENTRIES.clear();
+		VEHICLE_PACK.clear();
 		JcmScriptAlias.invalidate();
 		// 只处理原版资源包管理器真正加载了的包：未启用的包贴图/脚本/JSON 一律读不到，
 		// 注册出来只会造成 "Script ... is missing" 与 null 配置报错。
@@ -126,12 +135,12 @@ public final class NativeTrainLoader {
 				final JsonElement customTrains = root.get("custom_trains");
 				if (customTrains.isJsonObject()) {
 					for (final Map.Entry<String, JsonElement> entry : customTrains.getAsJsonObject().entrySet()) {
-						addEntry(entry.getKey().toLowerCase(Locale.ENGLISH), entry.getValue());
+						addEntry(Mtr3CompatPacks.packBaseName(packPath), entry.getKey().toLowerCase(Locale.ENGLISH), entry.getValue());
 					}
 				} else if (customTrains.isJsonArray()) {
 					for (final JsonElement element : customTrains.getAsJsonArray()) {
 						if (element.isJsonObject() && element.getAsJsonObject().has("id")) {
-							addEntry(element.getAsJsonObject().get("id").getAsString().toLowerCase(Locale.ENGLISH), element);
+							addEntry(Mtr3CompatPacks.packBaseName(packPath), element.getAsJsonObject().get("id").getAsString().toLowerCase(Locale.ENGLISH), element);
 						}
 					}
 				}
@@ -141,10 +150,10 @@ public final class NativeTrainLoader {
 		}
 	}
 
-	private static void addEntry(String id, JsonElement element) {
+	private static void addEntry(String pack, String id, JsonElement element) {
 		if (element.isJsonObject() && !id.isEmpty()) {
 			NATIVE_IDS.add(id);
-			ENTRIES.add(new NativeEntry2(id, element.getAsJsonObject()));
+			ENTRIES.add(new NativeEntry2(id, pack, element.getAsJsonObject()));
 		}
 	}
 
@@ -153,6 +162,7 @@ public final class NativeTrainLoader {
 		for (final NativeEntry2 entry : ENTRIES) {
 			try {
 				registerOne(entry, registerVehicle);
+				VEHICLE_PACK.put(entry.id, entry.pack);
 			} catch (Exception e) {
 				Mtr3CompatClient.LOGGER.warn("[mtr3compat] 原生注册失败: " + entry.id, e);
 			}

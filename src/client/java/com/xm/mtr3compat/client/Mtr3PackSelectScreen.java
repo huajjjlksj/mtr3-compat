@@ -7,16 +7,20 @@ import net.minecraft.network.chat.Component;
 
 import java.nio.file.Path;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 按包勾选界面：列出 resourcepacks 下所有 MTR 资源包，MTR3/MTR4 切换即时写配置；
- * 关闭时自动 F3+T 重载生效。
+ * 关闭时只有在勾选确实变化过才重载资源包，避免只是进来看一眼就触发整包重载。
  */
 public class Mtr3PackSelectScreen extends Screen {
 
 	private final Screen parent;
 	private List<Path> packList = Collections.emptyList();
+	/** 打开界面时的勾选快照，用于判断关闭时是否需要重载。 */
+	private Set<String> packsOnOpen;
 
 	public Mtr3PackSelectScreen(Screen parent) {
 		super(Component.literal("以 MTR3 加载的资源包"));
@@ -25,6 +29,9 @@ public class Mtr3PackSelectScreen extends Screen {
 
 	@Override
 	protected void init() {
+		if (packsOnOpen == null) {
+			packsOnOpen = new LinkedHashSet<>(Mtr3CompatConfig.getPacks());
+		}
 		addRenderableWidget(Button.builder(Component.literal("完成"), button -> onClose()).bounds(width / 2 - 100, height - 30, 200, 20).build());
 		packList = Mtr3CompatPacks.mtrPacks();
 		int y = 52;
@@ -56,6 +63,8 @@ public class Mtr3PackSelectScreen extends Screen {
 	public void onClose() {
 		Mtr3CompatConfig.save();
 		minecraft.setScreen(parent);
-		minecraft.reloadResourcePacks();
+		if (packsOnOpen == null || !packsOnOpen.equals(Mtr3CompatConfig.getPacks())) {
+			minecraft.reloadResourcePacks();
+		}
 	}
 }

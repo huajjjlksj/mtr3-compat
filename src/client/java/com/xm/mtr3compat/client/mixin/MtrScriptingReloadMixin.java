@@ -61,7 +61,7 @@ public class MtrScriptingReloadMixin {
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] ClassShutter 放开失败", e);
 		}
-		// 德水 nclcd draw.js 运行期用 java.lang.reflect.Array.newInstance 与 java.lang.Integer.TYPE，
+		// 部分 MTR3 资源包的 nclcd 脚本运行期用 java.lang.reflect.Array.newInstance 与 java.lang.Integer.TYPE，
 		// 被 JCM 默认 deny 的 java.lang.reflect.* / java.lang.Class 拦截（空 catch 吞掉后 LCD 空白）。
 		// 反射移除这两条 deny；Process/ProcessBuilder/ClassLoader/System 等危险类仍保持禁用。
 		try {
