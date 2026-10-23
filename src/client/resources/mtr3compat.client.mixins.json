@@ -28,6 +28,7 @@
 		"StationExitsCompatMixin",
 		"StopsDataStickyMixin",
 		"StopEqualsMixin",
+		"StationEqualsMixin",
 		"VehicleResourceGangwayMixin",
 		"VehicleResourceMatchesConditionMixin",
 		"VehicleSelectorScreenMixin"
