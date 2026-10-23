@@ -2,7 +2,6 @@ package com.xm.mtr3compat.client.mixin;
 
 import org.mtr.core.data.Station;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 
 /**
  * MTR3 语义里脚本拿到的 Station 与 DATA_CACHE 映射键是同一实例（世界数据单例），
@@ -14,9 +13,9 @@ import org.spongepowered.asm.mixin.Shadow;
 @Mixin(Station.class)
 public class StationEqualsMixin {
 
-	@Shadow
-	public long getId() {
-		throw null;
+	/** getId() 继承自父类，@Shadow 只查目标类自身声明会绑定失败，改用运行时转型虚调用。 */
+	private long mtr3compat$id() {
+		return ((Station) (Object) this).getId();
 	}
 
 	@Override
@@ -27,11 +26,11 @@ public class StationEqualsMixin {
 		if (!(obj instanceof Station)) {
 			return false;
 		}
-		return getId() == ((Station) obj).getId();
+		return mtr3compat$id() == ((Station) obj).getId();
 	}
 
 	@Override
 	public int hashCode() {
-		return Long.hashCode(getId());
+		return Long.hashCode(mtr3compat$id());
 	}
 }
