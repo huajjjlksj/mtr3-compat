@@ -299,7 +299,10 @@ public final class NativeTrainLoader {
 		final JsonArray partsArray = new JsonArray();
 
 		try {
-			processModel(legacy, currentCar, totalCars, isObj, reversed, propertiesObject.getAsJsonArray("parts"), positionDefinitionsArray, partsArray, doorMax);
+			// 部分车型的 model_properties 没有 parts（车身完全由脚本绘制），
+			// 直接 forEach null 会在渲染线程每帧抛 NPE，导致整帧 MTR 渲染中断（LCD 闪烁、下一站闪烁消失）。
+			final JsonArray propertyPartsArray = propertiesObject.getAsJsonArray("parts");
+			processModel(legacy, currentCar, totalCars, isObj, reversed, propertyPartsArray == null ? new JsonArray() : propertyPartsArray, positionDefinitionsArray, partsArray, doorMax);
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] processModel 失败: {} car={}/{}", id, currentCar, totalCars, e);
 		}

@@ -3,6 +3,7 @@ package com.xm.mtr3compat.client.mixin;
 import com.lx862.mtrscripting.mod.impl.mtr.vehicle.VehicleScriptContext;
 import com.lx862.mtrscripting.mod.impl.mtr.vehicle.VehicleWrapper;
 import com.xm.mtr3compat.client.Mtr3CompatClient;
+import com.xm.mtr3compat.client.StopsDataCache;
 import org.mtr.mod.data.VehicleExtension;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -23,7 +24,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Mixin(targets = "com.lx862.mtrscripting.mod.impl.mtr.vehicle.VehicleWrapper$StopsData")
 public class StopsDataStickyMixin {
 
-	private static final Map<Long, VehicleWrapper.StopsData> STICKY = new ConcurrentHashMap<>();
 	private static final Map<Long, String> LAST_LOG = new ConcurrentHashMap<>();
 
 	@Inject(method = "constructData", at = @At("RETURN"), cancellable = true)
@@ -35,9 +35,9 @@ public class StopsDataStickyMixin {
 		final long id = vehicle.getId();
 		VehicleWrapper.StopsData result = cir.getReturnValue();
 		if (result != null && result.isFullData && !result.allStops.isEmpty()) {
-			STICKY.put(id, result);
+			StopsDataCache.put(id, result);
 		} else {
-			final VehicleWrapper.StopsData cached = STICKY.get(id);
+			final VehicleWrapper.StopsData cached = StopsDataCache.get(id);
 			if (cached != null) {
 				result = cached;
 				cir.setReturnValue(cached);

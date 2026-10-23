@@ -14,6 +14,7 @@
 		"MtrScriptingReloadMixin",
 		"MatricesSetIdentityMixin",
 		"ModelPropertiesPartObjCopyMixin",
+		"ModelPropertiesPartNativeDisplayMixin",
 		"RenderVehiclesDebugMixin",
 	"PersistentVehicleDataAccessor",
 		"RailCompatMixin",
