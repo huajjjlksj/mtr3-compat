@@ -24,9 +24,12 @@ import org.mtr.mod.client.MinecraftClientData;
 import org.mtr.mod.packet.PacketRequestData;
 
 import java.lang.reflect.Field;
+import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -358,18 +361,7 @@ public final class MtrClientDataCompat {
 		final Map<Long, Map<Integer, VehicleWrapper.Stop.RouteInterchange>> stationIdToRoutes = new HashMap<>();
 		// MTR3 语义：每个车站都有连接站条目（可为空集）。MTR4 增量同步下远处车站可能缺席，
 		// 查不到时返回空集，避免脚本对结果直接 forEach 抛 "undefined" 中断渲染。
-		final Map<Station, Set<Station>> connecting = new HashMap<Station, Set<Station>>() {
-			@Override
-			public Set<Station> get(Object key) {
-				final Set<Station> value = super.get(key);
-				return value != null ? value : Collections.emptySet();
-			}
-
-			@Override
-			public boolean containsKey(Object key) {
-				return true;
-			}
-		};
+		final ConnectingMap connecting = connectingMap();
 
 		if (hasDataset) {
 			// 脚本里的 Stop.station/platform/siding 都是这个数据集的实例（VehicleDataCache.buildVehicleStopsData 直接取它），
@@ -433,6 +425,16 @@ public final class MtrClientDataCompat {
 						}
 					}
 				}
+				// 脚本的 getMapValueByKey 遍历 entrySet 用 == 比较键（Rhino 的 == 不调 equals），
+				// 而脚本传入的 station 是客户端实例（Stop.station 来自 MinecraftClientData.stationIdMap），
+				// 表键却是数据集实例 → 永不命中 → 返回 undefined → forEach 崩溃、LCD/走字屏整块空白。
+				// 这里为客户端实例镜像一组条目键，指向与数据集键同一个集合。
+				for (final Station clientStation : data.stations) {
+					final Station datasetStation = dataset.stationIdMap.get(clientStation.getId());
+					if (datasetStation != null) {
+						connecting.mirror(clientStation, connecting.get(datasetStation));
+					}
+				}
 			}
 		} else if (data != null) {
 			DATA_CACHE.stationIdMap = data.stationIdMap;
@@ -471,6 +473,50 @@ public final class MtrClientDataCompat {
 					hasDataset ? dataset.stations.size() : 0, hasDataset ? dataset.platforms.size() : 0,
 					hasDataset ? dataset.sidings.size() : 0, hasDataset ? dataset.routes.size() : 0,
 					clientStations, knownDepots.size(), trains, stationIdToRoutes.size(), connecting.size(), sidingIdToDepot.size(), accumulatedSidingToDepot.size());
+		}
+	}
+
+	/** MTR3 语义连接站表工厂（DATA_CACHE 字段初值与 rebuild 共用）。 */
+	static ConnectingMap connectingMap() {
+		return new ConnectingMap();
+	}
+
+	/**
+	 * MTR3 语义的 Map&lt;Station, Set&lt;Station&gt;&gt;：
+	 * - get/containsKey 对 miss 返回空集/true（MTR3 每个车站都有键，值可为空集）；
+	 * - entrySet 额外包含 {@link #mirror} 登记的客户端实例键条目 —— 脚本的 getMapValueByKey
+	 *   遍历 entrySet 用 == 比较键（Rhino 的 == 不调用 equals），必须让客户端 Station 实例也能命中。
+	 */
+	static final class ConnectingMap extends HashMap<Station, Set<Station>> {
+		private final List<Map.Entry<Station, Set<Station>>> mirrors = new ArrayList<>();
+
+		/** 以客户端实例为键镜像一个条目，值与数据集键指向同一集合。 */
+		void mirror(Station clientStation, Set<Station> value) {
+			mirrors.add(new AbstractMap.SimpleImmutableEntry<>(clientStation, value));
+		}
+
+		@Override
+		public Set<Station> get(Object key) {
+			final Set<Station> value = super.get(key);
+			return value != null ? value : Collections.emptySet();
+		}
+
+		@Override
+		public boolean containsKey(Object key) {
+			return true;
+		}
+
+		@Override
+		public Set<Map.Entry<Station, Set<Station>>> entrySet() {
+			if (mirrors.isEmpty()) {
+				return super.entrySet();
+			}
+			// 必须用身份去重：StationEqualsMixin 使按 id 相等的键的条目互相 equals，
+			// 普通 Set 会把镜像条目当作重复项丢弃，客户端实例键就又查不到了。
+			final Set<Map.Entry<Station, Set<Station>>> combined = Collections.newSetFromMap(new IdentityHashMap<>());
+			combined.addAll(super.entrySet());
+			combined.addAll(mirrors);
+			return combined;
 		}
 	}
 }
