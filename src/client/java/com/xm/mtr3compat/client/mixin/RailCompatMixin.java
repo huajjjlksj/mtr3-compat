@@ -1,5 +1,6 @@
 package com.xm.mtr3compat.client.mixin;
 
+import com.xm.mtr3compat.client.LegacyRailType;
 import org.mtr.core.data.Rail;
 import org.mtr.core.tool.Vector;
 import org.spongepowered.asm.mixin.Mixin;
@@ -20,5 +21,11 @@ public class RailCompatMixin {
 
 	public Vector getPosition(double progress) {
 		return ((Rail) (Object) this).railMath.getPosition(progress, false);
+	}
+
+	/** MTR3 的 Rail.railType.speedLimit；大连 MMI 屏每帧读它，缺失会让整段脚本抛异常。 */
+	public LegacyRailType getRailType() {
+		final Rail rail = (Rail) (Object) this;
+		return LegacyRailType.of(rail, (int) Math.max(rail.getSpeedLimitKilometersPerHour(false), rail.getSpeedLimitKilometersPerHour(true)));
 	}
 }

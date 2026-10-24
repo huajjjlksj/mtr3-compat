@@ -44,14 +44,20 @@ public abstract class VehicleResourceGangwayMixin {
 
 	@Inject(method = "hasGangway1", at = @At("TAIL"), cancellable = true)
 	private void mtr3compat$enableGangway1(CallbackInfoReturnable<Boolean> cir) {
-		if (!cir.getReturnValueZ() && !hasBarrier1() && hasNeighborTowards(-1)) {
+		if (!hasNeighborTowards(-1)) {
+			// 车头/车尾端即便包内声明了 gangway_connection_id 也不能开：否则 MTR 会在端部多铺一段
+			// 过道地板，玩家走进驾驶室会踩出车外掉下车。
+			cir.setReturnValue(false);
+		} else if (!cir.getReturnValueZ() && !hasBarrier1()) {
 			cir.setReturnValue(true);
 		}
 	}
 
 	@Inject(method = "hasGangway2", at = @At("TAIL"), cancellable = true)
 	private void mtr3compat$enableGangway2(CallbackInfoReturnable<Boolean> cir) {
-		if (!cir.getReturnValueZ() && !hasBarrier2() && hasNeighborTowards(1)) {
+		if (!hasNeighborTowards(1)) {
+			cir.setReturnValue(false);
+		} else if (!cir.getReturnValueZ() && !hasBarrier2()) {
 			cir.setReturnValue(true);
 		}
 	}
