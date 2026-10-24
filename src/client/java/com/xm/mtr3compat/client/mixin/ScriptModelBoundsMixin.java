@@ -32,13 +32,14 @@ public class ScriptModelBoundsMixin {
 	}
 
 	private static void dump(RawModelJS rawModel) {
-		if (rawModel == null || LOGGED.get() >= 3) {
+		if (rawModel == null || LOGGED.get() >= 8) {
 			return;
 		}
 		try {
 			final double[] min = {Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE};
 			final double[] max = {-Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE};
 			final int[] count = {0};
+			final java.util.TreeSet<Double> zValues = new java.util.TreeSet<>();
 			rawModel.rawModel.iterateRawMeshList(mesh -> {
 				for (final org.mtr.mapping.render.vertex.Vertex vertex : mesh.vertices) {
 					final double x = vertex.position.getX();
@@ -50,6 +51,7 @@ public class ScriptModelBoundsMixin {
 					max[0] = Math.max(max[0], x);
 					max[1] = Math.max(max[1], y);
 					max[2] = Math.max(max[2], z);
+					zValues.add(Math.round(z * 1000.0) / 1000.0);
 					count[0]++;
 				}
 			});
@@ -57,9 +59,21 @@ public class ScriptModelBoundsMixin {
 				return;
 			}
 			LOGGED.incrementAndGet();
+			final StringBuilder zs = new StringBuilder();
+			int printed = 0;
+			for (final double z : zValues) {
+				if (printed++ >= 12) {
+					zs.append("...");
+					break;
+				}
+				if (printed > 1) {
+					zs.append(',');
+				}
+				zs.append(fmt(z));
+			}
 			Mtr3CompatClient.LOGGER.info(
-					"[mtr3compat] script-model verts={} x=[{}, {}] y=[{}, {}] z=[{}, {}]",
-					count[0], fmt(min[0]), fmt(max[0]), fmt(min[1]), fmt(max[1]), fmt(min[2]), fmt(max[2]));
+					"[mtr3compat] script-model verts={} x=[{}, {}] y=[{}, {}] z=[{}, {}] zset={}",
+					count[0], fmt(min[0]), fmt(max[0]), fmt(min[1]), fmt(max[1]), fmt(min[2]), fmt(max[2]), zs);
 		} catch (Throwable e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] 打印脚本模型包围盒失败", e);
 		}
