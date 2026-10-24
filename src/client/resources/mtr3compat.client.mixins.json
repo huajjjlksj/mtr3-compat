@@ -16,6 +16,7 @@
 		"ModelPropertiesPartObjCopyMixin",
 	"PersistentVehicleDataAccessor",
 		"RailCompatMixin",
+		"RailLegacyApiMixin",
 		"ParsedScriptTrainEntryMixin",
 		"RawModelSourceLocationMixin",
 		"ResourceManagerHelperMixin",
