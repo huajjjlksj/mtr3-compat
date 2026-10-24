@@ -36,10 +36,17 @@ public class DoorScanFallbackMixin {
 		}
 		IN_FALLBACK.set(true);
 		try {
+			// 只向车身外侧扩，不能向内侧扩：向内侧扩会越过车体中轴、扫到对侧站台，
+			// 使两侧都被判为“可开门”（表现为对侧也显示本侧开门）。
+			final boolean leftSide = doorway.getMaxXMapped() <= 0;
 			for (final double expand : new double[]{1.5, 3.0}) {
 				final Box wider = new Box(
-						doorway.getMinXMapped() - expand, doorway.getMinYMapped() - 1, doorway.getMinZMapped() - 1,
-						doorway.getMaxXMapped() + expand, doorway.getMaxYMapped() + 1, doorway.getMaxZMapped() + 1);
+						leftSide ? doorway.getMinXMapped() - expand : doorway.getMinXMapped(),
+						doorway.getMinYMapped() - 1,
+						doorway.getMinZMapped() - 1,
+						leftSide ? doorway.getMaxXMapped() : doorway.getMaxXMapped() + expand,
+						doorway.getMaxYMapped() + 1,
+						doorway.getMaxZMapped() + 1);
 				if (Boolean.TRUE.equals(MTRUtil.canOpenDoors(wider, positionAndRotation))) {
 					if (LOGGED.getAndIncrement() < 6) {
 						Mtr3CompatClient.LOGGER.info("[mtr3compat] 开门扫描放宽命中 expand={} x=[{},{}] y={} z=[{},{}]",
