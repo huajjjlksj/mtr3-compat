@@ -353,6 +353,16 @@ public final class NativeTrainLoader {
 		return modelObjects.stream().map(modelObject -> new VehicleModel(new JsonReader(modelObject), new JsonReader(modelPropertiesObject), new JsonReader(positionDefinitionsObject), id, RESOURCE_PROVIDER)).collect(Collectors.toCollection(ObjectArrayList::new));
 	}
 
+	/** 是否为滚动显示的走字屏（display.should_scroll）。 */
+	private static boolean isScrollingDisplay(JsonObject propertiesPartsObject) {
+		try {
+			final JsonObject displayObject = propertiesPartsObject.getAsJsonObject("display");
+			return displayObject != null && displayObject.has("should_scroll") && displayObject.get("should_scroll").getAsBoolean();
+		} catch (Exception ignored) {
+			return false;
+		}
+	}
+
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
 	private static void processModel(LegacyEntry legacy, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax, boolean hideDisplay) {
 		propertiesPartsArray.forEach(jsonElement -> {
@@ -361,8 +371,9 @@ public final class NativeTrainLoader {
 			final String[] blacklistedCarsFilters = tryGet(propertiesPartsObject, "blacklisted_cars").split(",");
 
 			// MTR3 遗留的 display 部件（原生文字屏）：该包已改由脚本绘制 LCD，配置 hide_native_display
-			// 后直接不再生成这些部件，避免门上出现 MTR4 额外画出的屏幕。
-			if (hideDisplay && propertiesPartsObject.has("display")) {
+			// 后不再生成这些部件，避免门上出现 MTR4 额外画出的屏幕。
+			// 例外：should_scroll 的滚动显示屏（走字屏/LED）脚本并不替代，必须保留。
+			if (hideDisplay && propertiesPartsObject.has("display") && !isScrollingDisplay(propertiesPartsObject)) {
 				return;
 			}
 
