@@ -26,7 +26,6 @@
 		"VehicleRouteStopsMixin",
 		"VectorToStringMixin",
 		"ScriptResourceUtilMixin",
-		"ScriptModelBoundsMixin",
 		"StationExitsCompatMixin",
 		"StopsDataStickyMixin",
 		"StopEqualsMixin",

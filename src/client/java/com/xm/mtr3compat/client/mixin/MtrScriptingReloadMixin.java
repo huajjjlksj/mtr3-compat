@@ -160,7 +160,7 @@ public class MtrScriptingReloadMixin {
 			if (scriptFiles == null || !scriptFiles.isJsonArray()) {
 				continue;
 			}
-			final String key = mtr3compat$scriptKey(scriptFiles.getAsJsonArray());
+			final String key = mtr3compat$scriptKey(vehicleObject);
 			if (key == null) {
 				continue;
 			}
@@ -174,13 +174,25 @@ public class MtrScriptingReloadMixin {
 		return deduped;
 	}
 
-	private static String mtr3compat$scriptKey(JsonArray scriptFiles) {
+	private static String mtr3compat$scriptKey(JsonObject vehicleObject) {
 		final StringBuilder builder = new StringBuilder();
-		for (final JsonElement element : scriptFiles) {
+		for (final JsonElement element : vehicleObject.getAsJsonArray("script_files")) {
 			if (!element.isJsonPrimitive()) {
 				return null;
 			}
 			builder.append(element.getAsString()).append('\n');
+		}
+		// script_texts 决定脚本的具体参数（例如 nclcd 的 slots 文件：门数不同 offset 不同），
+		// 相同 script_files 但 script_texts 不同的车型必须各自编译，不能合并到同一脚本条目。
+		final JsonElement scriptTexts = vehicleObject.get("script_texts");
+		builder.append("--texts--\n");
+		if (scriptTexts != null && scriptTexts.isJsonArray()) {
+			for (final JsonElement element : scriptTexts.getAsJsonArray()) {
+				if (!element.isJsonPrimitive()) {
+					return null;
+				}
+				builder.append(element.getAsString()).append('\n');
+			}
 		}
 		return builder.toString();
 	}

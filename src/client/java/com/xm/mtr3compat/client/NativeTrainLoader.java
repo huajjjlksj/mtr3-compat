@@ -261,15 +261,14 @@ public final class NativeTrainLoader {
 		baseObject.addProperty("legacyRiderOffset", legacy.riderOffset());
 
 		final double finalDoorMax = doorMax;
-		final boolean hideDisplay = Mtr3CompatConfig.hideNativeDisplay(entry.pack);
-		Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册原生车型 {} length={} width={} doorMax={} hideDisplay={} model={}", entry.id, length, width, doorMax, hideDisplay, legacy.model());
+		Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册原生车型 {} length={} width={} doorMax={} model={}", entry.id, length, width, doorMax, legacy.model());
 		registerVehicle.accept(new VehicleResource(new JsonReader(baseObject),
-				(currentCar, totalCars) -> buildModels(legacy, propertiesObject, finalDoorMax, currentCar, totalCars, entry.id, hideDisplay),
+				(currentCar, totalCars) -> buildModels(legacy, propertiesObject, finalDoorMax, currentCar, totalCars, entry.id),
 				RESOURCE_PROVIDER));
 	}
 
 	/** 复刻 LegacyVehicleResource.convert 的 supplier lambda：逐车过滤 parts，构造 VehicleModel 列表。 */
-	private static ObjectArrayList<VehicleModel> buildModels(LegacyEntry legacy, JsonObject propertiesObject, double doorMax, int currentCar, int totalCars, String id, boolean hideDisplay) {
+	private static ObjectArrayList<VehicleModel> buildModels(LegacyEntry legacy, JsonObject propertiesObject, double doorMax, int currentCar, int totalCars, String id) {
 		boolean isObj = false;
 		boolean reversed = false;
 		final ObjectArrayList<JsonObject> modelObjects = new ObjectArrayList<>();
@@ -300,7 +299,7 @@ public final class NativeTrainLoader {
 		final JsonArray partsArray = new JsonArray();
 
 		try {
-			processModel(legacy, currentCar, totalCars, isObj, reversed, propertiesObject.getAsJsonArray("parts"), positionDefinitionsArray, partsArray, doorMax, hideDisplay);
+			processModel(legacy, currentCar, totalCars, isObj, reversed, propertiesObject.getAsJsonArray("parts"), positionDefinitionsArray, partsArray, doorMax);
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] processModel 失败: {} car={}/{}", id, currentCar, totalCars, e);
 		}
@@ -353,29 +352,12 @@ public final class NativeTrainLoader {
 		return modelObjects.stream().map(modelObject -> new VehicleModel(new JsonReader(modelObject), new JsonReader(modelPropertiesObject), new JsonReader(positionDefinitionsObject), id, RESOURCE_PROVIDER)).collect(Collectors.toCollection(ObjectArrayList::new));
 	}
 
-	/** 是否为滚动显示的走字屏（display.should_scroll）。 */
-	private static boolean isScrollingDisplay(JsonObject propertiesPartsObject) {
-		try {
-			final JsonObject displayObject = propertiesPartsObject.getAsJsonObject("display");
-			return displayObject != null && displayObject.has("should_scroll") && displayObject.get("should_scroll").getAsBoolean();
-		} catch (Exception ignored) {
-			return false;
-		}
-	}
-
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
-	private static void processModel(LegacyEntry legacy, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax, boolean hideDisplay) {
+	private static void processModel(LegacyEntry legacy, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
 		propertiesPartsArray.forEach(jsonElement -> {
 			final JsonObject propertiesPartsObject = jsonElement.getAsJsonObject();
 			final String[] whitelistedCarsFilters = tryGet(propertiesPartsObject, "whitelisted_cars").split(",");
 			final String[] blacklistedCarsFilters = tryGet(propertiesPartsObject, "blacklisted_cars").split(",");
-
-			// MTR3 遗留的 display 部件（原生文字屏）：该包已改由脚本绘制 LCD，配置 hide_native_display
-			// 后不再生成这些部件，避免门上出现 MTR4 额外画出的屏幕。
-			// 例外：should_scroll 的滚动显示屏（走字屏/LED）脚本并不替代，必须保留。
-			if (hideDisplay && propertiesPartsObject.has("display") && !isScrollingDisplay(propertiesPartsObject)) {
-				return;
-			}
 
 			if (matchesFilter(blacklistedCarsFilters, currentCar, totalCars) <= matchesFilter(whitelistedCarsFilters, currentCar, totalCars)) {
 				final JsonObject partsObject = new JsonObject();

@@ -24,14 +24,11 @@ import java.util.Set;
  *   "mtr3_packs": ["包名（不含 .zip）", ...],
  *   "script_car_offsets": {
  *     "包名（不含 .zip）": { "x": 0, "y": 0, "z": -2.5 }
- *   },
- *   "hide_native_display": ["包名（不含 .zip）", ...]
+ *   }
  * }
  * </pre>
  * mtr3_packs：被本 mod 拦截 MTR4/JCM 解析、改以 MTR3 模式加载的资源包。
  * script_car_offsets：按资源包给脚本“车厢空间”绘制加的平移量，x/y/z 任意组合、缺省为 0。
- * hide_native_display：该包车型的模型 display 部件不再由 MTR4 画原生文字屏
- * （MTR3 时代遗留的 display 部件在 MTR4 下会变成多余的屏幕）。
  * 文件被修改后 ≤0.5 秒内自动生效，无需重载资源包或重启游戏。
  */
 public final class Mtr3CompatConfig {
@@ -39,8 +36,6 @@ public final class Mtr3CompatConfig {
 	private static final Set<String> MTR3_PACKS = new LinkedHashSet<>();
 	/** 包名（已归一化）-> 平移量 [x, y, z]。 */
 	private static final Map<String, float[]> SCRIPT_CAR_OFFSETS = new HashMap<>();
-	/** 关闭原生 display 部件的资源包（已归一化）。 */
-	private static final Set<String> HIDE_NATIVE_DISPLAY = new LinkedHashSet<>();
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final long RELOAD_INTERVAL_NANOS = 500_000_000L;
 
@@ -78,15 +73,6 @@ public final class Mtr3CompatConfig {
 			return null;
 		}
 		return offset;
-	}
-
-	/** 该资源包是否关闭模型自带的原生 display 部件。 */
-	public static boolean hideNativeDisplay(String packName) {
-		if (packName == null) {
-			return false;
-		}
-		reloadIfModified();
-		return HIDE_NATIVE_DISPLAY.contains(normalize(packName));
 	}
 
 	public static void toggle(String packName) {
@@ -149,12 +135,6 @@ public final class Mtr3CompatConfig {
 					});
 				}
 			}
-			HIDE_NATIVE_DISPLAY.clear();
-			if (object.has("hide_native_display") && object.get("hide_native_display").isJsonArray()) {
-				for (final JsonElement element : object.getAsJsonArray("hide_native_display")) {
-					HIDE_NATIVE_DISPLAY.add(normalize(element.getAsString()));
-				}
-			}
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] 读取配置失败", e);
 		}
@@ -185,9 +165,6 @@ public final class Mtr3CompatConfig {
 				offsets.add(pack, object);
 			});
 			root.add("script_car_offsets", offsets);
-			final JsonArray hidden = new JsonArray();
-			HIDE_NATIVE_DISPLAY.forEach(hidden::add);
-			root.add("hide_native_display", hidden);
 			Files.write(path, GSON.toJson(root).getBytes(StandardCharsets.UTF_8));
 			lastModified = Files.getLastModifiedTime(path).toMillis();
 		} catch (Exception e) {
