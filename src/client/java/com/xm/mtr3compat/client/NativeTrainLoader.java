@@ -40,9 +40,21 @@ public final class NativeTrainLoader {
 	private static final ObjectArrayList<NativeEntry2> ENTRIES = new ObjectArrayList<>();
 	/** 原生注册的车型 id -> 来源资源包名（不含 .zip），供按包区分的渲染校正使用。 */
 	private static final java.util.HashMap<String, String> VEHICLE_PACK = new java.util.HashMap<>();
+	/** 原生注册的车型 id -> 脚本“车厢空间”沿车长的补偿量（格），由包自身车门数据推导。 */
+	private static final java.util.HashMap<String, Double> VEHICLE_SCRIPT_Z_SHIFT = new java.util.HashMap<>();
 
 	public static String packOf(String vehicleId) {
 		return VEHICLE_PACK.get(vehicleId);
+	}
+
+	/**
+	 * 脚本 drawCarModel 的“车厢空间”沿车长补偿量（格）。
+	 * MTR3 车门部件以半个门距为步长成对建模，脚本绘制的门载 LCD/贴图相对原生车门部件整体偏移
+	 * 半个门距；该值完全由包内车门 positions 推导，不需要配置，也不含任何包名。
+	 */
+	public static double scriptZShiftOf(String vehicleId) {
+		final Double value = vehicleId == null ? null : VEHICLE_SCRIPT_Z_SHIFT.get(vehicleId);
+		return value == null ? 0 : value;
 	}
 
 	/** 经启用中的资源包读取 OBJ/贴图/JSON（勾选包仍在原版正常启用，仅解析被拦截）。 */
@@ -111,6 +123,7 @@ public final class NativeTrainLoader {
 		NATIVE_IDS.clear();
 		ENTRIES.clear();
 		VEHICLE_PACK.clear();
+		VEHICLE_SCRIPT_Z_SHIFT.clear();
 		JcmScriptAlias.invalidate();
 		// 只处理原版资源包管理器真正加载了的包：未启用的包贴图/脚本/JSON 一律读不到，
 		// 注册出来只会造成 "Script ... is missing" 与 null 配置报错。
@@ -261,7 +274,8 @@ public final class NativeTrainLoader {
 		baseObject.addProperty("legacyRiderOffset", legacy.riderOffset());
 
 		final double finalDoorMax = doorMax;
-		Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册原生车型 {} length={} width={} doorMax={} model={}", entry.id, length, width, doorMax, legacy.model());
+		VEHICLE_SCRIPT_Z_SHIFT.put(entry.id, deriveScriptZShift(propertiesObject));
+		Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册原生车型 {} length={} width={} doorMax={} scriptZShift={} model={}", entry.id, length, width, doorMax, scriptZShiftOf(entry.id), legacy.model());
 		registerVehicle.accept(new VehicleResource(new JsonReader(baseObject),
 				(currentCar, totalCars) -> buildModels(legacy, propertiesObject, finalDoorMax, currentCar, totalCars, entry.id),
 				RESOURCE_PROVIDER));
@@ -350,6 +364,47 @@ public final class NativeTrainLoader {
 		positionDefinitionsObject.add("positionDefinitions", positionDefinitionsArray);
 		Mtr3CompatClient.LOGGER.info("[mtr3compat] {} car={}/{} models={} parts={} posDefs={}", id, currentCar, totalCars, modelObjects.size(), partsArray.size(), positionDefinitionsArray.size());
 		return modelObjects.stream().map(modelObject -> new VehicleModel(new JsonReader(modelObject), new JsonReader(modelPropertiesObject), new JsonReader(positionDefinitionsObject), id, RESOURCE_PROVIDER)).collect(Collectors.toCollection(ObjectArrayList::new));
+	}
+
+	/**
+	 * 从包内车门部件的 positions 推导脚本“车厢空间”的沿车长补偿量：最小门距的一半（格）。
+	 * positions 的 z 为 1/16 格单位，半门距 = 最小 z 间距 / 16 / 2。无车门部件时返回 0。
+	 */
+	private static double deriveScriptZShift(JsonObject propertiesObject) {
+		try {
+			final java.util.TreeSet<Double> zValues = new java.util.TreeSet<>();
+			for (final JsonElement element : propertiesObject.getAsJsonArray("parts")) {
+				final JsonObject part = element.getAsJsonObject();
+				if (!part.has("door_offset") && !part.has("door_offset_z")) {
+					continue;
+				}
+				for (final String property : new String[]{"positions", "positions_flipped"}) {
+					if (!part.has(property) || !part.get(property).isJsonArray()) {
+						continue;
+					}
+					for (final JsonElement position : part.getAsJsonArray(property)) {
+						final JsonElement z = position.getAsJsonArray().get(1);
+						if (z != null && z.isJsonPrimitive()) {
+							zValues.add(Math.abs(z.getAsDouble()));
+						}
+					}
+				}
+			}
+			double step = 0;
+			Double previous = null;
+			for (final double z : zValues) {
+				if (previous != null) {
+					final double difference = Math.abs(z - previous);
+					if (difference > 1e-4 && (step == 0 || difference < step)) {
+						step = difference;
+					}
+				}
+				previous = z;
+			}
+			return step / 32.0;
+		} catch (Exception e) {
+			return 0;
+		}
 	}
 
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */

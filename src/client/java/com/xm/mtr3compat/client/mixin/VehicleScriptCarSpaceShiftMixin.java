@@ -4,7 +4,6 @@ import com.lx862.mtrscripting.core.util.Matrices;
 import com.lx862.mtrscripting.core.util.model.ModelJS;
 import com.lx862.mtrscripting.mod.impl.mtr.vehicle.VehicleScriptContext;
 import com.xm.mtr3compat.client.Mtr3CompatClient;
-import com.xm.mtr3compat.client.Mtr3CompatConfig;
 import com.xm.mtr3compat.client.NativeTrainLoader;
 import org.mtr.mod.data.VehicleExtension;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,14 +13,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 复刻 ANTE 对“车厢空间”脚本绘制的坐标系语义（验证阶段）。
+ * “车厢空间”脚本绘制的沿车长补偿。
  * <p>
- * NTE：RawMeshBuilder 写入顶点时 y、z 已取负，渲染侧 SowcerModelAgent 再乘 Rx(π) 抵消，
- * 最终与脚本坐标一致。
- * JCM：RawMeshBuilderJS#vertex 同样写成 (x, -y, -z)，但 matrices == null 时走 RenderDrawCall
- * 的空变换分支，只补 Rx(180)·I·Rx(-180) = I，抵消丢失。
- * 这里对 MTR3 模式拦截的包改传一个显式 rotateXDegrees(180) 的 Matrices，
- * 使 JCM 组合出 Rx(180)，等价于 NTE 的 Rx(π)。不再读取任何位移配置。
+ * MTR3 资源包的车门部件按半个门距成对建模，脚本绘制的门载贴图（如车门 LCD）相对原生车门部件
+ * 整体差半个门距。补偿量由 {@link NativeTrainLoader#scriptZShiftOf(String)} 从包自身的车门
+ * positions 推导，不读取任何配置、也不涉及具体包名。
+ * <p>
+ * 只有 matrices == null（脚本以车厢坐标系直接绘制）时才需要补偿；脚本自带矩阵时保持原样。
  */
 @Mixin(value = VehicleScriptContext.class, remap = false)
 public class VehicleScriptCarSpaceShiftMixin {
@@ -31,8 +29,6 @@ public class VehicleScriptCarSpaceShiftMixin {
 
 	@Shadow
 	private int[] myCars;
-
-	private static boolean logged = false;
 
 	@Inject(
 			method = "drawCarModel(Lcom/lx862/mtrscripting/core/util/model/ModelJS;ILcom/lx862/mtrscripting/core/util/Matrices;)V",
@@ -44,22 +40,12 @@ public class VehicleScriptCarSpaceShiftMixin {
 			return;
 		}
 		try {
-			final String pack = packOfCar(carIndex);
-			if (!logged) {
-				logged = true;
-				Mtr3CompatClient.LOGGER.info("[mtr3compat] drawCarModel car={} pack={} intercepted={} shift={}",
-						carIndex, pack, pack != null && Mtr3CompatConfig.isIntercepted(pack),
-						pack == null ? 0 : Mtr3CompatConfig.carSpaceShift(pack));
-			}
-			if (pack == null) {
-				return;
-			}
-			final double shift = Mtr3CompatConfig.carSpaceShift(pack);
+			final double shift = NativeTrainLoader.scriptZShiftOf(vehicleIdOf(carIndex));
 			if (shift == 0) {
 				return;
 			}
 			final Matrices shifted = new Matrices();
-			shifted.translate(0, 0, (float) shift);
+			shifted.translate(0, 0, (float) -shift);
 			((VehicleScriptContext) (Object) this).drawCarModel(model, carIndex, shifted);
 			ci.cancel();
 		} catch (Throwable e) {
@@ -67,11 +53,11 @@ public class VehicleScriptCarSpaceShiftMixin {
 		}
 	}
 
-	private String packOfCar(int carIndex) {
+	private String vehicleIdOf(int carIndex) {
 		try {
 			final int[] cars = myCars;
 			final int globalCar = cars != null && carIndex >= 0 && carIndex < cars.length ? cars[carIndex] : carIndex;
-			return NativeTrainLoader.packOf(vehicleExtension.vehicleExtraData.immutableVehicleCars.get(globalCar).getVehicleId());
+			return vehicleExtension.vehicleExtraData.immutableVehicleCars.get(globalCar).getVehicleId();
 		} catch (Throwable ignored) {
 			return null;
 		}

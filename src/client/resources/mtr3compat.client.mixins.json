@@ -31,8 +31,6 @@
 		"StopEqualsMixin",
 		"StationEqualsMixin",
 		"VehicleResourceGangwayMixin",
-		"ScriptModelBoundsMixin",
-		"ScriptRenderManagerInvokeMixin",
 		"VehicleResourceMatchesConditionMixin",
 		"VehicleSelectorScreenMixin"
 	],
