@@ -5,7 +5,6 @@ import com.lx862.mtrscripting.core.util.model.ModelJS;
 import com.lx862.mtrscripting.mod.impl.mtr.vehicle.VehicleScriptContext;
 import com.xm.mtr3compat.client.Mtr3CompatClient;
 import com.xm.mtr3compat.client.Mtr3CompatConfig;
-import com.xm.mtr3compat.client.Mtr3CompatTweak;
 import com.xm.mtr3compat.client.NativeTrainLoader;
 import org.mtr.mod.data.VehicleExtension;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,10 +14,14 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * 部分 MTR3 资源包的脚本在“车厢空间”绘制（drawCarModel 传 null matrices）时，
- * 整体沿车长存在常量偏移。平移量来自 config 的 car_space_z_shift 与运行中可编辑的
- * mtr3-compat-tweak.txt，按车型所属资源包取值；未配置的包不受影响，
- * 显式传 matrices 的绘制也不受影响。整段逻辑吞掉所有异常，避免打断脚本渲染。
+ * 复刻 ANTE 对“车厢空间”脚本绘制的坐标系语义（验证阶段）。
+ * <p>
+ * NTE：RawMeshBuilder 写入顶点时 y、z 已取负，渲染侧 SowcerModelAgent 再乘 Rx(π) 抵消，
+ * 最终与脚本坐标一致。
+ * JCM：RawMeshBuilderJS#vertex 同样写成 (x, -y, -z)，但 matrices == null 时走 RenderDrawCall
+ * 的空变换分支，只补 Rx(180)·I·Rx(-180) = I，抵消丢失。
+ * 这里对 MTR3 模式拦截的包改传一个显式 rotateXDegrees(180) 的 Matrices，
+ * 使 JCM 组合出 Rx(180)，等价于 NTE 的 Rx(π)。不再读取任何位移配置。
  */
 @Mixin(value = VehicleScriptContext.class, remap = false)
 public class VehicleScriptCarSpaceShiftMixin {
@@ -28,6 +31,8 @@ public class VehicleScriptCarSpaceShiftMixin {
 
 	@Shadow
 	private int[] myCars;
+
+	private static boolean logged = false;
 
 	@Inject(
 			method = "drawCarModel(Lcom/lx862/mtrscripting/core/util/model/ModelJS;ILcom/lx862/mtrscripting/core/util/Matrices;)V",
@@ -40,10 +45,16 @@ public class VehicleScriptCarSpaceShiftMixin {
 		}
 		try {
 			final String pack = packOfCar(carIndex);
+			if (!logged) {
+				logged = true;
+				Mtr3CompatClient.LOGGER.info("[mtr3compat] drawCarModel car={} pack={} intercepted={} shift={}",
+						carIndex, pack, pack != null && Mtr3CompatConfig.isIntercepted(pack),
+						pack == null ? 0 : Mtr3CompatConfig.carSpaceShift(pack));
+			}
 			if (pack == null) {
 				return;
 			}
-			final double shift = Mtr3CompatConfig.carSpaceShift(pack) + Mtr3CompatTweak.shiftFor(pack);
+			final double shift = Mtr3CompatConfig.carSpaceShift(pack);
 			if (shift == 0) {
 				return;
 			}

@@ -1,7 +1,6 @@
 package com.xm.mtr3compat.client.mixin;
 
 import com.lx862.mtrscripting.mod.impl.mtr.vehicle.VehicleWrapper;
-import com.xm.mtr3compat.client.Mtr3CompatClient;
 import org.mtr.core.data.SimplifiedRoute;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.spongepowered.asm.mixin.Mixin;
@@ -10,9 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * JCM 的 getStops() 把该车要跑的**所有**线路的站串成一个列表（日志里 stops=20 routes=2），
@@ -26,8 +23,6 @@ import java.util.Map;
  */
 @Mixin(VehicleWrapper.class)
 public abstract class VehicleRouteStopsMixin {
-
-	private static final Map<Long, String> LAST_LOG = new HashMap<>();
 
 	@Shadow
 	public abstract List<VehicleWrapper.Stop> getStops();
@@ -54,21 +49,6 @@ public abstract class VehicleRouteStopsMixin {
 		}
 		if (filtered.isEmpty()) {
 			return;
-		}
-		try {
-			final long id = ((VehicleWrapper) (Object) this).getId();
-			final StringBuilder builder = new StringBuilder();
-			builder.append("stops=").append(filtered.size()).append('/').append(allStops.size())
-					.append(" route=").append(routeId)
-					.append(" progress=").append(String.format("%.1f", getRailProgress()));
-			for (int i = 0; i < Math.min(3, filtered.size()); i++) {
-				builder.append(" d").append(i).append('=').append(String.format("%.1f", filtered.get(i).distance));
-			}
-			final String message = builder.toString();
-			if (!message.equals(LAST_LOG.put(id, message))) {
-				Mtr3CompatClient.LOGGER.info("[mtr3compat] routeStops#{} {}", id, message);
-			}
-		} catch (Throwable ignored) {
 		}
 		cir.setReturnValue(filtered);
 	}

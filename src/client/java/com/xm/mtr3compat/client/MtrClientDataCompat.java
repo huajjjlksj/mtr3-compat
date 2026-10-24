@@ -127,7 +127,14 @@ public final class MtrClientDataCompat {
 	/** 每条侧线已请求车厂数据的次数与上次请求时间，用于失败重试。 */
 	private static final Map<Long, Integer> depotRequestAttempts = new HashMap<>();
 	private static final Map<Long, Long> depotRequestTimes = new HashMap<>();
-	private static final int MAX_DEPOT_REQUEST_ATTEMPTS = 5;
+	/**
+	 * 每条侧线最多请求一次车厂数据。此前是每 500ms 就发一个半径 1024 的 DataRequest，
+	 * 服务端每次都要按新圆心做全量数据收集并回传，实测会把服务端（含单人存档的内置服务端）
+	 * 拖慢到影响车厂发车时序（设定 20 秒一趟却几分钟才发、立即发车失效）。
+	 * 车厂只用于脚本显示，延迟到即可，不值得为此持续压制服务端。
+	 */
+	private static final int MAX_DEPOT_REQUEST_ATTEMPTS = 1;
+	private static final long DEPOT_REQUEST_INTERVAL_MILLIS = 60_000L;
 	private static volatile long lastDepotRequestMillis = 0L;
 	private static volatile String lastLogSignature = "";
 
@@ -240,7 +247,7 @@ public final class MtrClientDataCompat {
 			return;
 		}
 		final long now = System.currentTimeMillis();
-		if (now - lastDepotRequestMillis < 500L) {
+		if (now - lastDepotRequestMillis < DEPOT_REQUEST_INTERVAL_MILLIS) {
 			return;
 		}
 		Siding target = null;
@@ -250,8 +257,7 @@ public final class MtrClientDataCompat {
 				continue;
 			}
 			final int attempts = depotRequestAttempts.getOrDefault(id, 0);
-			final long lastAttempt = depotRequestTimes.getOrDefault(id, 0L);
-			if (attempts < MAX_DEPOT_REQUEST_ATTEMPTS && now - lastAttempt > 5_000L) {
+			if (attempts < MAX_DEPOT_REQUEST_ATTEMPTS) {
 				target = siding;
 				break;
 			}
