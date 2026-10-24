@@ -13,6 +13,8 @@
 		"DoorDebugMixin",
 		"MtrScriptingReloadMixin",
 		"MatricesSetIdentityMixin",
+		"ModelPropertiesPartSchemaAccessor",
+		"NativeDisplayPartMixin",
 		"ModelPropertiesPartObjCopyMixin",
 	"PersistentVehicleDataAccessor",
 		"RailCompatMixin",
