@@ -261,14 +261,15 @@ public final class NativeTrainLoader {
 		baseObject.addProperty("legacyRiderOffset", legacy.riderOffset());
 
 		final double finalDoorMax = doorMax;
-		Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册原生车型 {} length={} width={} doorMax={} model={}", entry.id, length, width, doorMax, legacy.model());
+		final boolean hideDisplay = Mtr3CompatConfig.hideNativeDisplay(entry.pack);
+		Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册原生车型 {} length={} width={} doorMax={} hideDisplay={} model={}", entry.id, length, width, doorMax, hideDisplay, legacy.model());
 		registerVehicle.accept(new VehicleResource(new JsonReader(baseObject),
-				(currentCar, totalCars) -> buildModels(legacy, propertiesObject, finalDoorMax, currentCar, totalCars, entry.id),
+				(currentCar, totalCars) -> buildModels(legacy, propertiesObject, finalDoorMax, currentCar, totalCars, entry.id, hideDisplay),
 				RESOURCE_PROVIDER));
 	}
 
 	/** 复刻 LegacyVehicleResource.convert 的 supplier lambda：逐车过滤 parts，构造 VehicleModel 列表。 */
-	private static ObjectArrayList<VehicleModel> buildModels(LegacyEntry legacy, JsonObject propertiesObject, double doorMax, int currentCar, int totalCars, String id) {
+	private static ObjectArrayList<VehicleModel> buildModels(LegacyEntry legacy, JsonObject propertiesObject, double doorMax, int currentCar, int totalCars, String id, boolean hideDisplay) {
 		boolean isObj = false;
 		boolean reversed = false;
 		final ObjectArrayList<JsonObject> modelObjects = new ObjectArrayList<>();
@@ -299,7 +300,7 @@ public final class NativeTrainLoader {
 		final JsonArray partsArray = new JsonArray();
 
 		try {
-			processModel(legacy, currentCar, totalCars, isObj, reversed, propertiesObject.getAsJsonArray("parts"), positionDefinitionsArray, partsArray, doorMax);
+			processModel(legacy, currentCar, totalCars, isObj, reversed, propertiesObject.getAsJsonArray("parts"), positionDefinitionsArray, partsArray, doorMax, hideDisplay);
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] processModel 失败: {} car={}/{}", id, currentCar, totalCars, e);
 		}
@@ -353,11 +354,17 @@ public final class NativeTrainLoader {
 	}
 
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
-	private static void processModel(LegacyEntry legacy, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
+	private static void processModel(LegacyEntry legacy, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax, boolean hideDisplay) {
 		propertiesPartsArray.forEach(jsonElement -> {
 			final JsonObject propertiesPartsObject = jsonElement.getAsJsonObject();
 			final String[] whitelistedCarsFilters = tryGet(propertiesPartsObject, "whitelisted_cars").split(",");
 			final String[] blacklistedCarsFilters = tryGet(propertiesPartsObject, "blacklisted_cars").split(",");
+
+			// MTR3 遗留的 display 部件（原生文字屏）：该包已改由脚本绘制 LCD，配置 hide_native_display
+			// 后直接不再生成这些部件，避免门上出现 MTR4 额外画出的屏幕。
+			if (hideDisplay && propertiesPartsObject.has("display")) {
+				return;
+			}
 
 			if (matchesFilter(blacklistedCarsFilters, currentCar, totalCars) <= matchesFilter(whitelistedCarsFilters, currentCar, totalCars)) {
 				final JsonObject partsObject = new JsonObject();
