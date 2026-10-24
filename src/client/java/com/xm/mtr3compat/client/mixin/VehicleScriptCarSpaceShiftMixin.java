@@ -45,7 +45,7 @@ public class VehicleScriptCarSpaceShiftMixin {
 				return;
 			}
 			final Matrices shifted = new Matrices();
-			shifted.translate(0, 0, (float) -shift);
+			shifted.translate(0, 0, (float) shift);
 			((VehicleScriptContext) (Object) this).drawCarModel(model, carIndex, shifted);
 			ci.cancel();
 		} catch (Throwable e) {
