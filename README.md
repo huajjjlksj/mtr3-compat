@@ -74,20 +74,6 @@
 
 在车辆选择面板中选择已注册的车型；面板顶部可切换「MTR3 自动编组」，开启后按轨道长度自动铺满整列车。
 
-## 从源码构建
-
-```bash
-# 1. 自行准备依赖 jar（本项目不附带第三方二进制）
-mkdir libs
-# 将 mtr-fabric-4.0.5+1.20.1.jar 与 JCM-fabric-2.3.0-beta.2+1.20.1.jar 放入 libs/
-
-# 2. 构建
-./gradlew build
-# 产物：build/libs/mtr3-compat-0.1.0.jar
-```
-
-依赖说明见 [build.gradle](build.gradle)；模组元数据见 [fabric.mod.json](src/main/resources/fabric.mod.json)。
-
 ## 已知限制
 
 - 仅客户端生效；服务器端不会同步本模组的任何逻辑。
