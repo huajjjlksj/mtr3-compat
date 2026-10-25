@@ -8,7 +8,7 @@ import java.util.Map;
  * VehicleResourceProvider.parseMtrResources 里把脚本登记为
  *   mtr_custom_train_(id) / (id)_cab_1 / _cab_2 / _cab_3 / _trailer
  * 而 mtr3-compat 以原 id 注册原生车辆，导致 getVehicleScriptEntryId(原id) 查表落空、脚本不执行
- * （典型症状：CR300AF 由 wheel.js 绘制的车轮不渲染）。
+ * （典型症状：脚本绘制的部件（如车轮）不渲染）。
  *
  * 本类在渲染原生车辆前，把原 id 别名到已登记的 legacy 条目，不改动车辆 id 与 JCM 代码。
  * 通过反射访问 JCM 内部字段，JCM 不存在或字段变更时静默跳过。

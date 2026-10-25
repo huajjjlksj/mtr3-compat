@@ -21,7 +21,7 @@ import java.util.List;
  * </pre>
  * JCM 的 {@code ModelManager.uploadVertArrays()} 返回的是 {@code ModelJS}，没有
  * uploadedOpaqueParts / uploadedTranslucentParts / meshList，脚本在上面直接抛
- * TypeError，导致整辆车（LCD、电显、电视、车号）的脚本都不执行。武汉包即为此例。
+ * TypeError，导致整辆车（LCD、电显、电视、车号）的脚本都不执行。
  *
  * 这里把 MTR4 的 {@code OptimizedModel.uploadedParts} 包装成旧 API 的形状；
  * 颜色通过换成带新 MaterialProperties 的 VertexArray 生效（MTR4 的顶点色是

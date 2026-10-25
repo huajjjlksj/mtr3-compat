@@ -12,3 +12,6 @@ build/
 
 # 运行目录（如用 runClient 生成）
 run/
+
+# 第三方二进制依赖（自行放入 libs/，不随仓库分发）
+libs/*.jar

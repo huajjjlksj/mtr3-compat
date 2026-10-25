@@ -18,8 +18,7 @@ import java.util.List;
 
 /**
  * JCM 的 ParsedScript 只收集 create / render / dispose 三个入口，NTE 的列车级 LCD 脚本
- * （createTrain / renderTrain / disposeTrain，如西安包 xa_metro_lcd/.../main_xa15.js）
- * 因此从未被执行：既不显示、也不报错。这里按 JCM 自身 tryAndAddFunction 的规则
+ * （createTrain / renderTrain / disposeTrain）从未被执行：既不显示、也不报错。这里按 JCM 自身 tryAndAddFunction 的规则
  * （取 scope 顶层函数 -> 加入列表 -> 从 scope 删除）补上三个入口。
  * 构造期当前线程没有 Rhino Context，必须先 Context.enter() 才能操作 scope。
  */

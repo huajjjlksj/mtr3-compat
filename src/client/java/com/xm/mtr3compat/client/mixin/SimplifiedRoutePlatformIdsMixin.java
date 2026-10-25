@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * JCM 的 {@code Stop.route} 是 MTR4 的 SimplifiedRoute（只有 getPlatforms()），
- * 而 MTR3 脚本按 {@code route.platformIds} 读取站台（gzmtr mtr_util.js 等）。
+ * 而 MTR3 脚本按 {@code route.platformIds} 读取站台。
  * 这里补同名公有字段，值为惰性委托列表。
  */
 @Mixin(SimplifiedRoute.class)

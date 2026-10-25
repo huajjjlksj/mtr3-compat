@@ -11,7 +11,7 @@ import java.lang.reflect.Field;
 import java.util.List;
 
 /**
- * MTR3 资源包常把同一个 OBJ 组复用给多节车（如 CRH2C 的 cheti_m3 同时用于 4、6 号车）。
+ * MTR3 资源包常把同一个 OBJ 组复用给多节车（同一部件同时用于多节车厢）。
  * MTR4 的 ModelPropertiesPart.writeCache 直接包装 nameToObjModels 里的共享 ObjModel 实例，
  * 而 ObjModel.addTransformation 会把变换后的网格<原地追加>到该实例，导致多节车的位移全部累积，
  * 部件被复制到其它车厢的位置（表现为部件/内饰错位）。NTE 中每个部件都会 copy 一份模型，故 MTR3 无此问题。

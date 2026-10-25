@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * JCM 的 {@code VehicleScriptContext.drawConnModel(...)} 是空实现，直接
  * {@code throw new NotImplementedException}（车厢贯通道模型）。
  *
- * 武汉包 conn0601.js 在 render 里每帧调用它，异常被 ParsedScript 捕获后进入 4 秒失败冷却，
+ * 部分脚本在 render 里每帧调用它，异常被 ParsedScript 捕获后进入 4 秒失败冷却，
  * 该车辆所有脚本（含 LCD）随之停止刷新 —— 表现为 LCD 显示出来但画面卡死。
  *
  * 这里改为登记模型+矩阵，由 {@link ConnStretchRenderMixin} 在渲染管线中

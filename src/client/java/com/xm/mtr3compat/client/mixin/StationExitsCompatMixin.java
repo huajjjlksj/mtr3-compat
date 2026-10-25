@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * MTR4 的 Station.exits 是 List&lt;StationExit&gt;（字段声明在 StationSchema，final），
- * NTE 脚本却按 MTR3 的 Map 用：station.exits.entrySet()（西安包 pis_config_parser.js#6），
+ * NTE 脚本却按 MTR3 的 Map 用：station.exits.entrySet()，
  * Rhino 读 Java 对象属性走的是字段本身，所以必须替换字段实例而不是加 getter。
  * 这里在 StationSchema 构造后把 exits 换成同类型子类 Mtr3StationExits（额外带 entrySet()），
  * MTR 内部后续的增删改仍作用在同一对象上，出口数据不会丢。

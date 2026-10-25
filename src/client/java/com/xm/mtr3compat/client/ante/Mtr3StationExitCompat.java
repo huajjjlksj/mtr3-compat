@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * MTR4 的 Station.exits 是 {@code List<StationExit>}（字段在 StationSchema，final），
- * 西安包脚本按 MTR3 的 Map 语义调用 {@code exits.entrySet()}。
+ * 部分 NTE 脚本按 MTR3 的 Map 语义调用 {@code exits.entrySet()}。
  * 这里在 JCM 组装 StopsData 时（已确认会执行的路径）把每个 Stop.station 的 exits 字段
  * 反射替换成 {@link Mtr3StationExits}，MTR 内部后续对同一对象的增删仍生效。
  */

@@ -61,7 +61,7 @@ public class MtrScriptingReloadMixin {
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] ClassShutter 放开失败", e);
 		}
-		// 部分 MTR3 资源包的 nclcd 脚本运行期用 java.lang.reflect.Array.newInstance 与 java.lang.Integer.TYPE，
+		// 部分 MTR3 资源包的 LCD 脚本运行期用 java.lang.reflect.Array.newInstance 与 java.lang.Integer.TYPE，
 		// 被 JCM 默认 deny 的 java.lang.reflect.* / java.lang.Class 拦截（空 catch 吞掉后 LCD 空白）。
 		// 反射移除这两条 deny；Process/ProcessBuilder/ClassLoader/System 等危险类仍保持禁用。
 		try {
@@ -158,8 +158,7 @@ public class MtrScriptingReloadMixin {
 			if (scriptFiles == null || !scriptFiles.isJsonArray()) {
 				continue;
 			}
-			// 先去掉同一车型 script_files 内的重复条目（gzmtr_b2_lcd 把 gz_const.js 写了两次、
-			// gzmtr_b3_* 把 numgzb3.js 写了两次）。JCM/Rhino 把所有脚本在同一作用域求值，
+			// 先去掉同一车型 script_files 内的重复条目（同一脚本文件被写了两次）。JCM/Rhino 把所有脚本在同一作用域求值，
 			// 同一文件执行两次会触发 const 重声明，整段脚本解析失败。保持首次出现顺序。
 			final JsonArray originalArray = scriptFiles.getAsJsonArray();
 			final JsonArray dedupedArray = mtr3compat$dedupIntraArray(originalArray);
@@ -209,7 +208,7 @@ public class MtrScriptingReloadMixin {
 			}
 			builder.append(element.getAsString()).append('\n');
 		}
-		// script_texts 决定脚本的具体参数（例如 nclcd 的 slots 文件：门数不同 offset 不同），
+		// script_texts 决定脚本的具体参数（例如 LCD 的 slots 文件：门数不同 offset 不同），
 		// 相同 script_files 但 script_texts 不同的车型必须各自编译，不能合并到同一脚本条目。
 		final JsonElement scriptTexts = vehicleObject.get("script_texts");
 		builder.append("--texts--\n");

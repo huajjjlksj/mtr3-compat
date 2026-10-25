@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * 会被判定为 prohibited，导致整段脚本解析失败。
  *
  * 之前只在“勾选接管”的包（mtr3_packs）解析前才放开 com.xm.mtr3compat.*，
- * 原生加载的资源包（如武汉包）走不到那条路径。这里改为对兼容层自身包无条件放行。
+ * 原生加载的资源包走不到那条路径。这里改为对兼容层自身包无条件放行。
  */
 @Mixin(targets = "com.lx862.mtrscripting.core.api.MTRClassShutter", remap = false)
 public class ClassShutterCompatMixin {

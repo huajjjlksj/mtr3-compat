@@ -18,7 +18,7 @@ import java.util.Map;
 
 /**
  * MTR4 的 VehicleExtraData.immutablePath 会随列车状态在“单段”和“上一/本/下一线路拼接”之间切换，
- * 而 NTE 脚本（西安包 conn.js）只在首帧取一次 train.path()，并把它累加出的 pathLength 数组长期缓存。
+ * 而 NTE 脚本只在首帧取一次 train.path()，并把它累加出的 pathLength 数组长期缓存。
  * 若兼容层每帧把列表换成新窗口，脚本缓存的 pathLength 与列表内容就会错位
  * （railIndex 指向另一段 → railValue 偏移甚至 NaN → 风挡随机左右偏移，窗口恢复后又自愈）。
  *
@@ -27,7 +27,7 @@ import java.util.Map;
  *
  * 另外：MTR4 用绝对累积距离编号轨道，停车位置常落在两段轨道交界处。若按原进度取值会取到
  * “后一段”（dwellTime 恒为 0），且停车时进度抖动会让索引在交界两侧跳变，导致脚本的
- * trainStatus 在 arrived / on_route 间抖动（大连 LCD 开门小灯时有时无）。故统一取 progress - 1，
+ * trainStatus 在 arrived / on_route 间抖动（LCD 开门小灯时有时无）。故统一取 progress - 1，
  * 与 MTR4 自身计算车头索引的方式一致。
  */
 @Mixin(VehicleWrapper.class)
@@ -41,7 +41,7 @@ public class VehicleRailIndexMixin {
 	private static final Map<Long, ObjectArrayList<PathData>> STABLE_PATH = new HashMap<>();
 
 	/**
-	 * 只冻结、不清空：脚本（conn.js / LCD）在首帧就把分段与 pathLength 缓存下来，
+	 * 只冻结、不清空：脚本（贯通道 / LCD）在首帧就把分段与 pathLength 缓存下来，
 	 * 之后任何“列表被替换或短暂变空”都会让它的索引错位或整块画空。
 	 * 因此快照一旦建立就长期沿用，仅当列车整体退回到快照起点之前（换线/反向重新出发）才重锚。
 	 */
@@ -75,7 +75,7 @@ public class VehicleRailIndexMixin {
 	}
 
 	/**
-	 * 脚本（conn.js 贯通道角度）必须与渲染管线用同一份进度：
+	 * 脚本的贯通道角度必须与渲染管线用同一份进度：
 	 * MTR4 渲染按 smoothedRailProgress 摆放车厢，但 JCM 的 getRailProgress() 返回服务端原始值。
 	 * 行驶中原始值每次同步跳变、平滑值滞后收敛（≈1 秒），停站开门时平滑被冻结（adjustmentAmount=0），
 	 * 两者之差在曲线上表现为风挡随机左右大幅偏移、停站持续、启动后才恢复。
