@@ -1,0 +1,74 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	id 'maven-publish'
+}
+
+repositories {
+	// Loom adds the essential maven repositories automatically.
+}
+
+loom {
+	splitEnvironmentSourceSets()
+
+	mods {
+		"mtr3compat" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	mappings loom.officialMojangMappings()
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// MTR 本体：编译期 Mixin 目标 + 开发运行环境
+	modCompileOnly files("libs/mtr-fabric-4.0.5+1.20.1.jar")
+	modLocalRuntime files("libs/mtr-fabric-4.0.5+1.20.1.jar")
+
+	// JCM：复用其重打包的 Rhino（com.lx862.mtrscripting.lib.org.mozilla.javascript.*）
+	modCompileOnly files("libs/JCM-fabric-2.3.0-beta.2+1.20.1.jar")
+	modLocalRuntime files("libs/JCM-fabric-2.3.0-beta.2+1.20.1.jar")
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 17
+}
+
+java {
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_17
+	targetCompatibility = JavaVersion.VERSION_17
+}
+
+jar {
+	def projectName = project.name
+	inputs.property "projectName", projectName
+
+	from("LICENSE") {
+		rename { "${it}_$projectName" }
+	}
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			from components.java
+		}
+	}
+	repositories {
+	}
+}
