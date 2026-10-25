@@ -118,13 +118,10 @@ public class MtrScriptingReloadMixin {
 					continue;
 				}
 				final JsonObject rootObject = root.getAsJsonObject();
-				final int deduped = mtr3compat$dedupScripts(rootObject);
+				mtr3compat$dedupScripts(rootObject);
 				MtrScriptingResourceManager.vehicle.parseMtrResources(rootObject, rootObject.has("custom_trains"));
 				MtrScriptingResourceManager.eyecandy.parseMtrResources(rootObject, rootObject.has("custom_eyecandy"));
 				MtrScriptingResourceManager.lift.parseMtrResources(rootObject, rootObject.has("custom_lifts"));
-				if (deduped > 0) {
-					Mtr3CompatClient.LOGGER.info("[mtr3compat] 脚本去重: {} 个重复条目改为 script_id 引用（省 {} 次编译）", packName, deduped);
-				}
 			} catch (Exception e) {
 				Mtr3CompatClient.LOGGER.warn("[mtr3compat] 脚本重喂失败: " + packName, e);
 			}
@@ -148,6 +145,7 @@ public class MtrScriptingReloadMixin {
 		final JsonObject trains = trainsElement.getAsJsonObject();
 		final Map<String, String> firstByScript = new HashMap<>();
 		int deduped = 0;
+		int intraDeduped = 0;
 		for (final Map.Entry<String, JsonElement> entry : trains.entrySet()) {
 			if (!entry.getValue().isJsonObject()) {
 				continue;
@@ -160,6 +158,15 @@ public class MtrScriptingReloadMixin {
 			if (scriptFiles == null || !scriptFiles.isJsonArray()) {
 				continue;
 			}
+			// 先去掉同一车型 script_files 内的重复条目（gzmtr_b2_lcd 把 gz_const.js 写了两次、
+			// gzmtr_b3_* 把 numgzb3.js 写了两次）。JCM/Rhino 把所有脚本在同一作用域求值，
+			// 同一文件执行两次会触发 const 重声明，整段脚本解析失败。保持首次出现顺序。
+			final JsonArray originalArray = scriptFiles.getAsJsonArray();
+			final JsonArray dedupedArray = mtr3compat$dedupIntraArray(originalArray);
+			if (dedupedArray.size() != originalArray.size()) {
+				vehicleObject.add("script_files", dedupedArray);
+				intraDeduped += originalArray.size() - dedupedArray.size();
+			}
 			final String key = mtr3compat$scriptKey(vehicleObject);
 			if (key == null) {
 				continue;
@@ -171,7 +178,27 @@ public class MtrScriptingReloadMixin {
 				deduped++;
 			}
 		}
+		if (intraDeduped > 0 || deduped > 0) {
+			Mtr3CompatClient.LOGGER.info("[mtr3compat] 脚本去重: 数组内重复 {} 条, 跨车型 script_id 引用 {} 个", intraDeduped, deduped);
+		}
 		return deduped;
+	}
+
+	/** 去掉 JsonArray 内的重复字符串条目，保持首次出现顺序。非字符串条目原样保留。 */
+	private static JsonArray mtr3compat$dedupIntraArray(JsonArray array) {
+		final JsonArray result = new JsonArray();
+		final java.util.Set<String> seen = new java.util.HashSet<>();
+		for (final JsonElement element : array) {
+			if (element.isJsonPrimitive()) {
+				final String value = element.getAsString();
+				if (seen.add(value)) {
+					result.add(element);
+				}
+			} else {
+				result.add(element);
+			}
+		}
+		return result;
 	}
 
 	private static String mtr3compat$scriptKey(JsonObject vehicleObject) {

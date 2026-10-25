@@ -14,6 +14,7 @@ import java.util.Set;
 /**
  * 按包勾选界面：列出 resourcepacks 下所有 MTR 资源包，MTR3/MTR4 切换即时写配置；
  * 关闭时只有在勾选确实变化过才重载资源包，避免只是进来看一眼就触发整包重载。
+ * 包数量超过一屏时可翻页（上一页/下一页）。
  */
 public class Mtr3PackSelectScreen extends Screen {
 
@@ -21,6 +22,7 @@ public class Mtr3PackSelectScreen extends Screen {
 	private List<Path> packList = Collections.emptyList();
 	/** 打开界面时的勾选快照，用于判断关闭时是否需要重载。 */
 	private Set<String> packsOnOpen;
+	private int page;
 
 	public Mtr3PackSelectScreen(Screen parent) {
 		super(Component.literal("以 MTR3 加载的资源包"));
@@ -32,21 +34,39 @@ public class Mtr3PackSelectScreen extends Screen {
 		if (packsOnOpen == null) {
 			packsOnOpen = new LinkedHashSet<>(Mtr3CompatConfig.getPacks());
 		}
-		addRenderableWidget(Button.builder(Component.literal("完成"), button -> onClose()).bounds(width / 2 - 100, height - 30, 200, 20).build());
 		packList = Mtr3CompatPacks.mtrPacks();
-		int y = 52;
-		for (final Path path : packList) {
-			final String name = Mtr3CompatPacks.packBaseName(path);
+
+		final int bottomRowY = height - 28;
+		final int firstY = 52;
+		final int perPage = Math.max(1, (bottomRowY - 8 - firstY) / 24);
+		final int totalPages = Math.max(1, (packList.size() + perPage - 1) / perPage);
+		page = Math.min(Math.max(page, 0), totalPages - 1);
+
+		final int start = page * perPage;
+		final int end = Math.min(packList.size(), start + perPage);
+		int y = firstY;
+		for (int i = start; i < end; i++) {
+			final String name = Mtr3CompatPacks.packBaseName(packList.get(i));
 			final Component label = Component.literal((Mtr3CompatConfig.isIntercepted(name) ? "MTR3: " : "MTR4: ") + name);
 			addRenderableWidget(Button.builder(label, button -> {
 				Mtr3CompatConfig.toggle(name);
 				init(minecraft, width, height);
 			}).bounds(width / 2 - 160, y, 320, 20).build());
 			y += 24;
-			if (y > height - 44) {
-				break;
-			}
 		}
+
+		addRenderableWidget(Button.builder(Component.literal("上一页"), button -> {
+			page--;
+			init(minecraft, width, height);
+		}).bounds(width / 2 - 170, bottomRowY, 60, 20).build()).active = page > 0;
+
+		addRenderableWidget(Button.builder(Component.literal("完成"), button -> onClose())
+				.bounds(width / 2 - 60, bottomRowY, 120, 20).build());
+
+		addRenderableWidget(Button.builder(Component.literal("下一页"), button -> {
+			page++;
+			init(minecraft, width, height);
+		}).bounds(width / 2 + 110, bottomRowY, 60, 20).build()).active = page < totalPages - 1;
 	}
 
 	@Override
@@ -56,6 +76,11 @@ public class Mtr3PackSelectScreen extends Screen {
 		guiGraphics.drawCenteredString(font, Component.literal("MTR3 = 该包由 mtr3-compat 接管（MTR4/JCM 不解析），需同时在原版资源包界面启用"), width / 2, 30, 0xAAAAAA);
 		if (packList.isEmpty()) {
 			guiGraphics.drawCenteredString(font, Component.literal("未在 resourcepacks 目录找到含 mtr_custom_resources.json 的资源包"), width / 2, 60, 0xFFAAAA);
+		} else {
+			final int bottomRowY = height - 28;
+			final int perPage = Math.max(1, (bottomRowY - 8 - 52) / 24);
+			final int totalPages = Math.max(1, (packList.size() + perPage - 1) / perPage);
+			guiGraphics.drawCenteredString(font, Component.literal(String.format("第 %d/%d 页 · 共 %d 个包", page + 1, totalPages, packList.size())), width / 2, bottomRowY - 14, 0xAAAAAA);
 		}
 	}
 

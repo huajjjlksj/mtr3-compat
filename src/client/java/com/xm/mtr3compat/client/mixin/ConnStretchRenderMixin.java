@@ -1,9 +1,11 @@
 package com.xm.mtr3compat.client.mixin;
 
+import com.lx862.mtrscripting.core.util.Matrices;
 import com.lx862.mtrscripting.core.util.ScriptVector3f;
 import com.lx862.mtrscripting.core.util.render.QuadDrawCall;
 import com.lx862.mtrscripting.core.util.render.ScriptRenderManager;
 import com.xm.mtr3compat.client.Mtr3CompatClient;
+import com.xm.mtr3compat.client.ante.ConnModelRegistry;
 import com.xm.mtr3compat.client.ante.ConnStretchRegistry;
 import org.mtr.core.data.VehicleCar;
 import org.mtr.core.tool.Vector;
@@ -45,6 +47,8 @@ public class ConnStretchRenderMixin {
 	private static void mtr3compat$nextFrame(long millisElapsed, Vector3d cameraShakeOffset, CallbackInfo ci) {
 		ConnStretchRegistry.nextFrame();
 		ConnStretchRegistry.prune();
+		ConnModelRegistry.nextFrame();
+		ConnModelRegistry.prune();
 	}
 
 	@Inject(method = "lambda$render$12", at = @At("HEAD"))
@@ -56,7 +60,8 @@ public class ConnStretchRenderMixin {
 			DynamicVehicleModel model, CallbackInfo ci) {
 		try {
 			final ConnStretchRegistry.Entry entry = ConnStretchRegistry.get(vehicle.getHexId(), carIndex);
-			if (entry == null) {
+			final ConnModelRegistry.Entry connEntry = ConnModelRegistry.get(vehicle.getHexId(), carIndex);
+			if (entry == null && connEntry == null) {
 				return;
 			}
 			if (carIndex < 0 || carIndex >= prevConnList.size()) {
@@ -91,21 +96,29 @@ public class ConnStretchRenderMixin {
 				zSum += lc[i].z;
 			}
 			final double faceZ = (zSum >= 0 ? 1 : -1) * car.getLength() / 2.0;
-			final Vector[] tc = new Vector[4];
-			for (int i = 0; i < 4; i++) {
-				tc[i] = new Vector(lc[i].x, lc[i].y, faceZ);
-			}
 			final ScriptRenderManager manager = new ScriptRenderManager();
-			// 外侧 4 面（UV 左半）
-			mtr3compat$quad(manager, entry.texture, "EXTERIOR", 0f, 0f, 0.5f, 0.5f, tc[1], lc[2], lc[3], tc[0]);
-			mtr3compat$quad(manager, entry.texture, "EXTERIOR", 0f, 0f, 0.5f, 0.5f, lc[1], tc[2], tc[3], lc[0]);
-			mtr3compat$quad(manager, entry.texture, "EXTERIOR", 0f, 0f, 0.5f, 0.5f, lc[2], tc[1], tc[2], lc[1]);
-			mtr3compat$quad(manager, entry.texture, "EXTERIOR", 0f, 0f, 0.5f, 0.5f, lc[0], tc[3], tc[0], lc[3]);
-			// 内侧 4 面（UV 右半，全亮）
-			mtr3compat$quad(manager, entry.texture, "INTERIOR", 0.5f, 0f, 1f, 0.5f, tc[2], lc[1], lc[0], tc[3]);
-			mtr3compat$quad(manager, entry.texture, "INTERIOR", 0.5f, 0f, 1f, 0.5f, lc[2], tc[1], tc[0], lc[3]);
-			mtr3compat$quad(manager, entry.texture, "INTERIOR", 0f, 0.5f, 0.5f, 1f, lc[1], tc[2], tc[1], lc[2]);
-			mtr3compat$quad(manager, entry.texture, "INTERIOR", 0.5f, 0.5f, 1f, 1f, lc[3], tc[0], tc[3], lc[0]);
+			if (entry != null) {
+				final Vector[] tc = new Vector[4];
+				for (int i = 0; i < 4; i++) {
+					tc[i] = new Vector(lc[i].x, lc[i].y, faceZ);
+				}
+				// 外侧 4 面（UV 左半）
+				mtr3compat$quad(manager, entry.texture, "EXTERIOR", 0f, 0f, 0.5f, 0.5f, tc[1], lc[2], lc[3], tc[0]);
+				mtr3compat$quad(manager, entry.texture, "EXTERIOR", 0f, 0f, 0.5f, 0.5f, lc[1], tc[2], tc[3], lc[0]);
+				mtr3compat$quad(manager, entry.texture, "EXTERIOR", 0f, 0f, 0.5f, 0.5f, lc[2], tc[1], tc[2], lc[1]);
+				mtr3compat$quad(manager, entry.texture, "EXTERIOR", 0f, 0f, 0.5f, 0.5f, lc[0], tc[3], tc[0], lc[3]);
+				// 内侧 4 面（UV 右半，全亮）
+				mtr3compat$quad(manager, entry.texture, "INTERIOR", 0.5f, 0f, 1f, 0.5f, tc[2], lc[1], lc[0], tc[3]);
+				mtr3compat$quad(manager, entry.texture, "INTERIOR", 0.5f, 0f, 1f, 0.5f, lc[2], tc[1], tc[0], lc[3]);
+				mtr3compat$quad(manager, entry.texture, "INTERIOR", 0f, 0.5f, 0.5f, 1f, lc[1], tc[2], tc[1], lc[2]);
+				mtr3compat$quad(manager, entry.texture, "INTERIOR", 0.5f, 0.5f, 1f, 1f, lc[3], tc[0], tc[3], lc[0]);
+			}
+			if (connEntry != null) {
+				// 贯通道模型以关节为原点，平移到本车端面后按脚本给的姿态绘制
+				final Matrices matrices = connEntry.matrices == null ? new Matrices() : connEntry.matrices.copy();
+				matrices.translate(0, 0, (float) faceZ);
+				manager.drawModel(connEntry.model, matrices);
+			}
 			final World world = World.cast(MinecraftClient.getInstance().getWorldMapped());
 			if (world == null) {
 				return;
