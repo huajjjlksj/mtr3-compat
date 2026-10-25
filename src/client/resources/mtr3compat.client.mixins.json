@@ -17,6 +17,8 @@
 		"ModelPropertiesPartObjCopyMixin",
 	"PersistentVehicleDataAccessor",
 		"RailCompatMixin",
+		"RoutePlatformIdsMixin",
+		"SimplifiedRoutePlatformIdsMixin",
 		"ParsedScriptTrainEntryMixin",
 		"RawModelSourceLocationMixin",
 		"ResourceManagerHelperMixin",
