@@ -24,6 +24,11 @@ import java.util.Map;
  *
  * 因此：首帧之后一律冻结该列表（不再清空重填），只有“整条路径换了起点”（换线/换向重新出发）
  * 时才重建；getRailIndex 也在同一份冻结列表上取索引，保证与脚本缓存同坐标系。
+ *
+ * 另外：MTR4 用绝对累积距离编号轨道，停车位置常落在两段轨道交界处。若按原进度取值会取到
+ * “后一段”（dwellTime 恒为 0），且停车时进度抖动会让索引在交界两侧跳变，导致脚本的
+ * trainStatus 在 arrived / on_route 间抖动（大连 LCD 开门小灯时有时无）。故统一取 progress - 1，
+ * 与 MTR4 自身计算车头索引的方式一致。
  */
 @Mixin(VehicleWrapper.class)
 public class VehicleRailIndexMixin {
@@ -92,7 +97,7 @@ public class VehicleRailIndexMixin {
 				cir.setReturnValue(0);
 				return;
 			}
-			final double target = progress - (fromEnd ? 1 : 0);
+			final double target = progress - 1;
 			int index = 0;
 			for (int i = 0; i < path.size(); i++) {
 				if (target >= path.get(i).getStartDistance()) {
