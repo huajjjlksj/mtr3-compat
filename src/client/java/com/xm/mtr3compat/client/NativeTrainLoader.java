@@ -15,6 +15,9 @@ import org.mtr.mod.resource.ResourceProvider;
 import org.mtr.mod.resource.VehicleModel;
 import org.mtr.mod.resource.VehicleResource;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -37,6 +40,8 @@ public final class NativeTrainLoader {
 	private static final String[] LEGACY_BARRIERS = {"london_underground_d78", "mlr", "r179"};
 
 	private static final ObjectOpenHashSet<String> NATIVE_IDS = new ObjectOpenHashSet<>();
+	/** 条目声明了 model/贴图/属性，但已启用资源包里实际不存在这些文件：无法渲染，故不注册（选车列表里也不会出现）。 */
+	private static final ObjectOpenHashSet<String> BROKEN_IDS = new ObjectOpenHashSet<>();
 	private static final ObjectArrayList<NativeEntry2> ENTRIES = new ObjectArrayList<>();
 	/** 原生注册的车型 id -> 来源资源包名（不含 .zip），供按包区分的渲染校正使用。 */
 	private static final java.util.HashMap<String, String> VEHICLE_PACK = new java.util.HashMap<>();
@@ -90,15 +95,15 @@ public final class NativeTrainLoader {
 		return NATIVE_IDS;
 	}
 
-	/** LegacyVehicleResource 生成的 4 变体 id 是否属于已原生注册的 mtr3-compat 车型（应抑制）。 */
+	/** LegacyVehicleResource 生成的 4 变体 id 是否属于已原生注册或已判定资源缺失的车型（应抑制）。 */
 	public static boolean shouldSuppress(String variantId) {
-		if (NATIVE_IDS.isEmpty() || !variantId.startsWith(VARIANTS_PREFIX)) {
+		if (!variantId.startsWith(VARIANTS_PREFIX)) {
 			return false;
 		}
 		for (final String suffix : VARIATION_SUFFIXES) {
 			if (variantId.endsWith(suffix)) {
 				final String base = variantId.substring(VARIANTS_PREFIX.length(), variantId.length() - suffix.length());
-				if (NATIVE_IDS.contains(base)) {
+				if (NATIVE_IDS.contains(base) || BROKEN_IDS.contains(base)) {
 					return true;
 				}
 			}
@@ -109,6 +114,7 @@ public final class NativeTrainLoader {
 	/** CustomResourceLoader.reload HEAD：直接读磁盘收集勾选（MTR3 模式）资源包的 custom_trains 条目。 */
 	public static void scan() {
 		NATIVE_IDS.clear();
+		BROKEN_IDS.clear();
 		ENTRIES.clear();
 		VEHICLE_PACK.clear();
 		JcmScriptAlias.invalidate();
@@ -171,8 +177,17 @@ public final class NativeTrainLoader {
 
 	private static void registerOne(NativeEntry2 entry, Consumer<VehicleResource> registerVehicle) {
 		final LegacyEntry legacy = new LegacyEntry(new JsonReader(entry.json));
+		final String missingResource = firstMissingResource(legacy);
+		if (missingResource != null) {
+			BROKEN_IDS.add(entry.id);
+			Mtr3CompatClient.LOGGER.warn("[mtr3compat] 资源包缺少文件，隐藏该车型: {} -> {}", entry.id, missingResource);
+			return;
+		}
+
 		final JsonObject propertiesObject = legacy.modelProperties().isEmpty() ? null : Utilities.parseJson(RESOURCE_PROVIDER.get(new Identifier(legacy.modelProperties())));
-		if (propertiesObject == null) {
+		if (propertiesObject == null || !propertiesObject.has("parts")) {
+			BROKEN_IDS.add(entry.id);
+			Mtr3CompatClient.LOGGER.warn("[mtr3compat] 缺少可用模型属性，隐藏该车型: {} -> {}", entry.id, legacy.modelProperties());
 			return;
 		}
 
@@ -251,9 +266,7 @@ public final class NativeTrainLoader {
 		// MTR3 语义：间距 = length(=props.length+1) + 0 + 0，车厢几何按槽位建模，禁止按变体位加 padding
 		baseObject.addProperty("couplingPadding1", 0);
 		baseObject.addProperty("couplingPadding2", 0);
-		// MTR3：has_gangway_connection 只影响连通性，风挡贴图仅在 gangway_connection_id 非空时才绘制。
-		// 为空时 MTR4 若按 sp1900 回退绘制，就会在每个车缝多出一层“别人的风挡”。
-		final boolean hasGangway = !legacy.gangwayConnectionId().isEmpty();
+		final boolean hasGangway = !effectiveGangwayId(legacy).isEmpty();
 		baseObject.addProperty("hasGangway1", hasGangway);
 		baseObject.addProperty("hasGangway2", hasGangway);
 		baseObject.addProperty("hasBarrier1", !legacy.trainBarrierId().isEmpty());
@@ -265,6 +278,31 @@ public final class NativeTrainLoader {
 		registerVehicle.accept(new VehicleResource(new JsonReader(baseObject),
 				(currentCar, totalCars) -> buildModels(legacy, propertiesObject, finalDoorMax, currentCar, totalCars, entry.id),
 				RESOURCE_PROVIDER));
+	}
+
+	/** 第一条在已启用资源包里找不到的文件（model / 属性 / 贴图）；全部存在返回 null。 */
+	private static String firstMissingResource(LegacyEntry legacy) {
+		for (final String resource : new String[]{legacy.model(), legacy.modelProperties(), legacy.textureId()}) {
+			if (!resource.isEmpty() && !resourceExists(resource)) {
+				return resource;
+			}
+		}
+		return null;
+	}
+
+	private static boolean resourceExists(String resource) {
+		final Minecraft client = Minecraft.getInstance();
+		if (client == null || client.getResourceManager() == null) {
+			return true;
+		}
+		final ResourceLocation identifier = ResourceLocation.tryParse(resource);
+		return identifier == null || client.getResourceManager().getResource(identifier).isPresent();
+	}
+
+	/** 声明了风挡连接但未给贴图的车型，回退到 MTR 内置 sp1900 风挡（`mtr:textures/gangway/sp1900_*`）。 */
+	private static String effectiveGangwayId(LegacyEntry legacy) {
+		final String gangwayId = legacy.gangwayConnectionId();
+		return gangwayId.isEmpty() && legacy.hasGangwayConnection() ? "mtr:textures/entity/sp1900" : gangwayId;
 	}
 
 	/** 复刻 LegacyVehicleResource.convert 的 supplier lambda：逐车过滤 parts，构造 VehicleModel 列表。 */
@@ -305,12 +343,11 @@ public final class NativeTrainLoader {
 		}
 
 		// Migrate legacy gangway & barriers
-		// 注意：has_gangway_connection 只表示“车厢连通”，MTR3 在 gangway_connection_id 为空时
-		// 并不绘制风挡（西安包这类车由脚本自己画 FD 模型）。若按 sp1900 贴图回退，
-		// MTR4 会在每个车缝额外叠一层 sp1900 风挡，看起来像“别的车的风挡”。
+		// has_gangway_connection=true 且 gangway_connection_id 为空的车型，MTR3 里靠模型几何画风挡；
+		// 该几何在 MTR4 下不再生效，故与官方修正包一致回退到内置 sp1900 风挡贴图。
 		final String barrierId = legacy.trainBarrierId();
 		String barrierBaseId = barrierId;
-		final String gangwayId = legacy.gangwayConnectionId();
+		final String gangwayId = effectiveGangwayId(legacy);
 		final boolean hasVisibleGangway = !gangwayId.isEmpty();
 		String gangwayConnectionBaseId = hasVisibleGangway ? gangwayId + "_connector" : "";
 		if (gangwayId.startsWith("mtr:textures/entity") && Arrays.stream(LEGACY_GANGWAYS).anyMatch(oldId -> gangwayId.startsWith("mtr:textures/entity/" + oldId))) {
