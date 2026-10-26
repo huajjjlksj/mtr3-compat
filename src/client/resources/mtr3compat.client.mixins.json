@@ -32,6 +32,7 @@
 		"VehicleRouteStopsMixin",
 		"VectorToStringMixin",
 		"ScriptResourceUtilMixin",
+		"ScriptInstanceManagerMixin",
 		"ScriptVector3fRotationMixin",
 		"StationExitsCompatMixin",
 		"StopsDataStickyMixin",
