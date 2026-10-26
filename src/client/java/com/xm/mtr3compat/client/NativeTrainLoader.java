@@ -95,6 +95,10 @@ public final class NativeTrainLoader {
 		return NATIVE_IDS;
 	}
 
+	public static int countNative() {
+		return NATIVE_IDS.size();
+	}
+
 	/** LegacyVehicleResource 生成的 4 变体 id 是否属于已原生注册或已判定资源缺失的车型（应抑制）。 */
 	public static boolean shouldSuppress(String variantId) {
 		if (!variantId.startsWith(VARIANTS_PREFIX)) {
@@ -282,12 +286,30 @@ public final class NativeTrainLoader {
 
 	/** 第一条在已启用资源包里找不到的文件（model / 属性 / 贴图）；全部存在返回 null。 */
 	private static String firstMissingResource(LegacyEntry legacy) {
-		for (final String resource : new String[]{legacy.model(), legacy.modelProperties(), legacy.textureId()}) {
-			if (!resource.isEmpty() && !resourceExists(resource)) {
-				return resource;
-			}
+		// MTR3 的 model 字段通常不带扩展名（实际文件是 .obj 或 .bbmodel），属性 json 也可能省略 .json
+		if (!legacy.model().isEmpty() && !resourceExistsAny(legacy.model(), ".obj", ".bbmodel")) {
+			return legacy.model();
+		}
+		if (!legacy.modelProperties().isEmpty() && !resourceExistsAny(legacy.modelProperties(), ".json")) {
+			return legacy.modelProperties();
+		}
+		if (!legacy.textureId().isEmpty() && !resourceExistsAny(legacy.textureId(), ".png")) {
+			return legacy.textureId();
 		}
 		return null;
+	}
+
+	/** 给定资源路径或路径前缀，任一候选（含各扩展名）存在即视为存在。 */
+	private static boolean resourceExistsAny(String resource, String... suffixes) {
+		if (resourceExists(resource)) {
+			return true;
+		}
+		for (final String suffix : suffixes) {
+			if (resourceExists(resource + suffix)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static boolean resourceExists(String resource) {

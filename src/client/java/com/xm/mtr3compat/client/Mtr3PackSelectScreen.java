@@ -3,6 +3,7 @@ package com.xm.mtr3compat.client;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.packs.PackSelectionScreen;
 import net.minecraft.network.chat.Component;
 
 import java.nio.file.Path;
@@ -13,7 +14,8 @@ import java.util.Set;
 
 /**
  * 按包勾选界面：列出 resourcepacks 下所有 MTR 资源包，MTR3/MTR4 切换即时写配置；
- * 关闭时只有在勾选确实变化过才重载资源包，避免只是进来看一眼就触发整包重载。
+ * 关闭时重载资源包，避免只是进来看一眼就触发整包重载。
+ * 从原版资源包界面进入时，关闭只返回原版界面、不重载，由原版界面的关闭流程统一触发一次。
  * 包数量超过一屏时可翻页（上一页/下一页）。
  */
 public class Mtr3PackSelectScreen extends Screen {
@@ -71,6 +73,7 @@ public class Mtr3PackSelectScreen extends Screen {
 
 	@Override
 	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+		renderBackground(guiGraphics);
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
 		guiGraphics.drawCenteredString(font, title, width / 2, 16, 0xFFFFFF);
 		guiGraphics.drawCenteredString(font, Component.literal("MTR3 = 该包由 mtr3-compat 接管（MTR4/JCM 不解析），需同时在原版资源包界面启用"), width / 2, 30, 0xAAAAAA);
@@ -87,8 +90,10 @@ public class Mtr3PackSelectScreen extends Screen {
 	@Override
 	public void onClose() {
 		Mtr3CompatConfig.save();
+		final boolean packsChanged = packsOnOpen != null && !packsOnOpen.equals(Mtr3CompatConfig.getPacks());
 		minecraft.setScreen(parent);
-		if (packsOnOpen == null || !packsOnOpen.equals(Mtr3CompatConfig.getPacks())) {
+		// 由原版资源包界面进入时不在此时重载：返回原版界面，由原版关闭流程决定（有改动则原版自己重载，无改动则由模组补一次）
+		if (packsChanged && !(parent instanceof PackSelectionScreen)) {
 			minecraft.reloadResourcePacks();
 		}
 	}

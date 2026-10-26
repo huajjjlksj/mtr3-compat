@@ -1,6 +1,8 @@
 package com.xm.mtr3compat.client.mixin;
 
+import com.xm.mtr3compat.client.Mtr3CompatClient;
 import com.xm.mtr3compat.client.NativeTrainLoader;
+import org.mtr.core.data.TransportMode;
 import org.mtr.mod.client.CustomResourceLoader;
 import org.mtr.mod.resource.VehicleResource;
 import org.spongepowered.asm.mixin.Mixin;
@@ -22,6 +24,10 @@ public class CustomResourceLoaderMixin {
 	@Inject(method = "reload()V", at = @At("TAIL"))
 	private static void mtr3compat$registerNative(CallbackInfo ci) {
 		NativeTrainLoader.register(vehicleResource -> mtr3compat$invokeRegisterVehicle(vehicleResource, false));
+		final int[] trainCount = {0};
+		CustomResourceLoader.iterateVehicles(TransportMode.TRAIN, vehicleResource -> trainCount[0]++);
+		Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册完成: TRAIN 车型={} 轨道样式={} 原生车型={}",
+				trainCount[0], CustomResourceLoader.getRails().size(), NativeTrainLoader.countNative());
 	}
 
 	/** 抑制 mtr3-compat 包经 LegacyVehicleResource 生成的 4 变体注册。 */

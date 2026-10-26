@@ -11,13 +11,14 @@
 ## 功能
 
 - **按包切换 MTR3 / MTR4 模式**：MTR 设置面板右下角「以MTR3加载」按钮，打开按包勾选界面；关闭界面时若勾选有变化会自动重载资源包。
+- **无需进入存档即可切换**：原版「选项 → 资源包」界面右上角新增图标按钮，点击直接进入同一个按包勾选界面；两个界面之间会自动协调重载（谁有改动由谁触发，均无改动则不重载）。
 - **MTR3 语义原生注册车型**：勾选的资源包里 `custom_trains` 条目按 MTR3 语义注册（一车一条目、无 MTR4 的四变体拆分），几何按 `(currentCar, totalCars)` 逐车过滤 `whitelisted_cars` / `blacklisted_cars`。
 - **NTE / JCM 脚本兼容层**：
   - 脚本解析窗口内把 `Resources.getMTRVersion()` 伪装为 MTR3 版本，避免脚本因检测到 MTR4 直接画蓝屏退出；
   - 提供 `MTRClientData.DATA_CACHE` 替身、`route.platformIds`、`rail.getLength()/getPosition()`、`station.exits.entrySet()`、`RawModel.sourceLocation`、`Matrices.setIdentity()` 等 MTR3/NTE 旧 API；
   - 修正车辆选车脚本、LCD 脚本、贯通道脚本的取进度/取车厢空间行为。
 - **MTR3 式自动编组**：车辆选择面板顶部开关，选中车型后按轨道长度自动铺满（默认开启）。
-- **渲染修正**：声明了风挡连接但未提供风挡贴图的车型回退到内置风挡贴图；模型/贴图/属性文件在已启用资源包中缺失的车型会被自动隐藏，避免出现「只有风挡没有车身」。
+- **渲染修正**：声明了风挡连接但未提供风挡贴图的车型回退到内置风挡贴图；模型/贴图/属性文件在已启用资源包中缺失的车型会被自动隐藏，避免出现「只有风挡没有车身」（检查时会自动补全 `.obj` / `.bbmodel` / `.json` / `.png` 扩展名）。
 - **配置热重载**：`config/mtr3-compat.json` 修改后 ≤0.5 秒自动生效，无需重启。
 
 ## 环境要求

@@ -9,6 +9,7 @@ repositories {
 
 loom {
 	splitEnvironmentSourceSets()
+	accessWidenerPath = file("src/client/resources/mtr3compat.accesswidener")
 
 	mods {
 		"mtr3compat" {

@@ -9,6 +9,7 @@
 	],
 	"license": "MIT",
 	"environment": "client",
+	"accessWidener": "mtr3compat.accesswidener",
 	"entrypoints": {
 		"client": [
 			"com.xm.mtr3compat.client.Mtr3CompatClient"
