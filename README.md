@@ -23,13 +23,15 @@
 
 ## 环境要求
 
+> **注意：当前发布版仅支持 JCM 2.3.0-beta.2。** 其他 JCM 版本（含 prerelease）未适配，可能导致启动崩溃。
+
 | 项目 | 要求 |
 | --- | --- |
 | Minecraft | 1.20.1 |
 | 加载器 | Fabric Loader（≥ 0.14.21） |
 | 前置 | Fabric API |
 | 前置 | Minecraft Transit Railway **4.0.5+**（fabric） |
-| 前置 | Joban Client Mod **2.3.0-beta.2+**（mod id `jsblock`） |
+| 前置 | Joban Client Mod **2.3.0-beta.2**（mod id `jsblock`，**仅此版本**） |
 | Java | 17+ |
 | 侧别 | **仅客户端**（服务器无需安装） |
 
@@ -103,3 +105,4 @@ src/client/java/com/xm/mtr3compat/client/
 - 感谢 Minecraft Transit Railway、Joban Client Mod 作者及各类资源包作者。
 - 本项目不包含任何资源包内容，也不附带 MTR / JCM 的二进制文件。
 - 模组元数据中声明的许可证为 MIT。
+
