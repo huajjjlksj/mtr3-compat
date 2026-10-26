@@ -21,7 +21,6 @@
 		"RoutePlatformIdsMixin",
 		"SimplifiedRoutePlatformIdsMixin",
 		"PackSelectionScreenMixin",
-		"ParsedScriptTrainEntryMixin",
 		"RawModelSourceLocationMixin",
 		"ResourceManagerHelperMixin",
 		"VehicleConfigCaptureMixin",
