@@ -13,7 +13,6 @@ import com.xm.mtr3compat.client.Mtr3CompatConfig;
 import com.xm.mtr3compat.client.Mtr3CompatPacks;
 import com.xm.mtr3compat.client.MtrClientDataCompat;
 import com.xm.mtr3compat.client.ante.AnteGlobals;
-import org.apache.logging.log4j.util.TriConsumer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -36,6 +35,19 @@ public class MtrScriptingReloadMixin {
 
 	/** parseScriptEvent 监听只注册一次；注册后晚于 JCM 自身监听，勾选包解析窗口内覆盖 MTRClientData 绑定。 */
 	private static boolean globalsHooked = false;
+
+	/** RhinoParsedScript 的脚本作用域（private 字段），供解析事件回调取用。 */
+	private static final java.lang.reflect.Field SCOPE_FIELD = mtr3compat$scopeField();
+
+	private static java.lang.reflect.Field mtr3compat$scopeField() {
+		try {
+			final java.lang.reflect.Field field = com.lx862.mtrscripting.core.rhinojs.RhinoParsedScript.class.getDeclaredField("scope");
+			field.setAccessible(true);
+			return field;
+		} catch (NoSuchFieldException e) {
+			throw new ExceptionInInitializerError(e);
+		}
+	}
 
 	private static void mtr3compat$ensureGlobalsHooked() {
 		if (globalsHooked) {
@@ -76,11 +88,19 @@ public class MtrScriptingReloadMixin {
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] ClassShutter deny 移除失败", e);
 		}
-		final TriConsumer<String, com.lx862.mtrscripting.lib.org.mozilla.javascript.Context, com.lx862.mtrscripting.lib.org.mozilla.javascript.Scriptable> override =
-				(name, ctx, scope) -> {
+		final java.util.function.BiConsumer<String, com.lx862.mtrscripting.core.primitive.ParsedScript> override =
+				(name, script) -> {
 					if (Mtr3CompatClient.SPOOF_MTR_VERSION) {
 						try {
-							AnteGlobals.bind(name, ctx, scope);
+							final com.lx862.mtrscripting.lib.org.mozilla.javascript.Scriptable scope =
+									(com.lx862.mtrscripting.lib.org.mozilla.javascript.Scriptable) SCOPE_FIELD.get(script);
+							final com.lx862.mtrscripting.lib.org.mozilla.javascript.Context ctx =
+									com.lx862.mtrscripting.lib.org.mozilla.javascript.Context.enter();
+							try {
+								AnteGlobals.bind(name, ctx, scope);
+							} finally {
+								com.lx862.mtrscripting.lib.org.mozilla.javascript.Context.exit();
+							}
 						} catch (Exception e) {
 							Mtr3CompatClient.LOGGER.warn("[mtr3compat] ANTE 全局绑定失败: " + name, e);
 						}

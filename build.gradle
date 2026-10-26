@@ -31,8 +31,8 @@ dependencies {
 	modLocalRuntime files("libs/mtr-fabric-4.0.5+1.20.1.jar")
 
 	// JCM：复用其重打包的 Rhino（com.lx862.mtrscripting.lib.org.mozilla.javascript.*）
-	modCompileOnly files("libs/JCM-fabric-2.3.0-beta.2+1.20.1.jar")
-	modLocalRuntime files("libs/JCM-fabric-2.3.0-beta.2+1.20.1.jar")
+	modCompileOnly files("libs/JCM-fabric-2.3.0-prerelease.1+1.20.1.jar")
+	modLocalRuntime files("libs/JCM-fabric-2.3.0-prerelease.1+1.20.1.jar")
 }
 
 processResources {
