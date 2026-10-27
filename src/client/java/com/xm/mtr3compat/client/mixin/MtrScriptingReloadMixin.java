@@ -91,6 +91,8 @@ public class MtrScriptingReloadMixin {
 		final java.util.function.BiConsumer<String, com.lx862.mtrscripting.core.primitive.ParsedScript> override =
 				(name, script) -> {
 					if (Mtr3CompatClient.SPOOF_MTR_VERSION) {
+						final long bindStart = System.nanoTime();
+						final boolean hasConfig = com.xm.mtr3compat.client.ante.ConfigCapture.LAST.get() != null;
 						try {
 							final com.lx862.mtrscripting.lib.org.mozilla.javascript.Scriptable scope =
 									(com.lx862.mtrscripting.lib.org.mozilla.javascript.Scriptable) SCOPE_FIELD.get(script);
@@ -103,6 +105,10 @@ public class MtrScriptingReloadMixin {
 							}
 						} catch (Exception e) {
 							Mtr3CompatClient.LOGGER.warn("[mtr3compat] ANTE 全局绑定失败: " + name, e);
+						}
+						final long bindMs = (System.nanoTime() - bindStart) / 1_000_000L;
+						if (bindMs >= 50L) {
+							Mtr3CompatClient.LOGGER.info("[mtr3compat] ANTE 绑定慢: {} = {}ms (config={})", name, bindMs, hasConfig);
 						}
 					}
 				};
@@ -139,9 +145,16 @@ public class MtrScriptingReloadMixin {
 				}
 				final JsonObject rootObject = root.getAsJsonObject();
 				mtr3compat$dedupScripts(rootObject);
+				final long vehicleStart = System.nanoTime();
 				MtrScriptingResourceManager.vehicle.parseMtrResources(rootObject, rootObject.has("custom_trains"));
+				final long vehicleMs = (System.nanoTime() - vehicleStart) / 1_000_000L;
+				final long eyecandyStart = System.nanoTime();
 				MtrScriptingResourceManager.eyecandy.parseMtrResources(rootObject, rootObject.has("custom_eyecandy"));
+				final long eyecandyMs = (System.nanoTime() - eyecandyStart) / 1_000_000L;
+				final long liftStart = System.nanoTime();
 				MtrScriptingResourceManager.lift.parseMtrResources(rootObject, rootObject.has("custom_lifts"));
+				final long liftMs = (System.nanoTime() - liftStart) / 1_000_000L;
+				Mtr3CompatClient.LOGGER.info("[mtr3compat] 脚本解析耗时 {}: vehicle={}ms eyecandy={}ms lift={}ms", packName, vehicleMs, eyecandyMs, liftMs);
 			} catch (Exception e) {
 				Mtr3CompatClient.LOGGER.warn("[mtr3compat] 脚本重喂失败: " + packName, e);
 			}
