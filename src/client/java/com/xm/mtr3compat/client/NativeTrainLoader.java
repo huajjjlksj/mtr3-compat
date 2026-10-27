@@ -181,18 +181,26 @@ public final class NativeTrainLoader {
 
 	private static void registerOne(NativeEntry2 entry, Consumer<VehicleResource> registerVehicle) {
 		final LegacyEntry legacy = new LegacyEntry(new JsonReader(entry.json));
-		final String missingResource = firstMissingResource(legacy);
+		final boolean scriptOnly = isScriptOnly(legacy);
+		final String missingResource = scriptOnly ? null : firstMissingResource(legacy);
 		if (missingResource != null) {
 			BROKEN_IDS.add(entry.id);
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] 资源包缺少文件，隐藏该车型: {} -> {}", entry.id, missingResource);
 			return;
 		}
 
-		final JsonObject propertiesObject = legacy.modelProperties().isEmpty() ? null : Utilities.parseJson(RESOURCE_PROVIDER.get(new Identifier(legacy.modelProperties())));
-		if (propertiesObject == null || !propertiesObject.has("parts")) {
-			BROKEN_IDS.add(entry.id);
-			Mtr3CompatClient.LOGGER.warn("[mtr3compat] 缺少可用模型属性，隐藏该车型: {} -> {}", entry.id, legacy.modelProperties());
-			return;
+		JsonObject propertiesObject;
+		if (scriptOnly) {
+			// 纯脚本车型：无 model/贴图，靠 base_type 提供尺寸，车身由脚本绘制，属性只需空 parts。
+			propertiesObject = new JsonObject();
+			propertiesObject.add("parts", new JsonArray());
+		} else {
+			propertiesObject = legacy.modelProperties().isEmpty() ? null : Utilities.parseJson(RESOURCE_PROVIDER.get(new Identifier(legacy.modelProperties())));
+			if (propertiesObject == null || !propertiesObject.has("parts")) {
+				BROKEN_IDS.add(entry.id);
+				Mtr3CompatClient.LOGGER.warn("[mtr3compat] 缺少可用模型属性，隐藏该车型: {} -> {}", entry.id, legacy.modelProperties());
+				return;
+			}
 		}
 
 		final JsonObject baseObject = new JsonObject();
@@ -282,6 +290,11 @@ public final class NativeTrainLoader {
 		registerVehicle.accept(new VehicleResource(new JsonReader(baseObject),
 				(currentCar, totalCars) -> buildModels(legacy, propertiesObject, finalDoorMax, currentCar, totalCars, entry.id),
 				RESOURCE_PROVIDER));
+	}
+
+	/** 纯脚本车型（MTR3/NTE 的 base_type 写法：无 model、无贴图，车身完全由脚本绘制）。 */
+	private static boolean isScriptOnly(LegacyEntry legacy) {
+		return legacy.model().isEmpty() && !legacy.baseTrainType().isEmpty();
 	}
 
 	/** 第一条在已启用资源包里找不到的文件（model / 属性 / 贴图）；全部存在返回 null。 */
