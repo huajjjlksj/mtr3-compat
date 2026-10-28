@@ -332,7 +332,24 @@ public final class NativeTrainLoader {
 		final JsonArray partsArray = new JsonArray();
 
 		try {
-			processModel(legacy, currentCar, totalCars, isObj, reversed, propertiesObject.getAsJsonArray("parts"), positionDefinitionsArray, partsArray, doorMax);
+			processModel(legacy, id, currentCar, totalCars, isObj, reversed, propertiesObject.getAsJsonArray("parts"), positionDefinitionsArray, partsArray, doorMax);
+
+			int normalCount = 0;
+			int doorwayCount = 0;
+			int displayCount = 0;
+			for (final JsonElement element : partsArray) {
+				final String type = tryGet(element.getAsJsonObject(), "type");
+				if ("DOORWAY".equals(type)) {
+					doorwayCount++;
+				} else if ("DISPLAY".equals(type)) {
+					displayCount++;
+				} else if ("NORMAL".equals(type)) {
+					normalCount++;
+				}
+			}
+			// floors 恒为空（MTR3 无 FLOOR 部件），因此 doorwayCount=0 会触发 MTR4 的兜底门洞（整节车两侧每格）。
+			Mtr3CompatClient.LOGGER.info("[mtr3compat] PARTS id={} car={}/{} isObj={} normal={} doorway={} display={} posDefs={} fallbackDoorway={}",
+					id, currentCar + 1, totalCars, isObj, normalCount, doorwayCount, displayCount, positionDefinitionsArray.size(), doorwayCount == 0);
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] processModel 失败: {} car={}/{}", id, currentCar, totalCars, e);
 		}
@@ -385,8 +402,10 @@ public final class NativeTrainLoader {
 	}
 
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
-	private static void processModel(LegacyEntry legacy, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
+	private static void processModel(LegacyEntry legacy, String id, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
+		final int[] partIndex = {0};
 		propertiesPartsArray.forEach(jsonElement -> {
+			final int index = partIndex[0]++;
 			final JsonObject propertiesPartsObject = jsonElement.getAsJsonObject();
 			final String[] whitelistedCarsFilters = tryGet(propertiesPartsObject, "whitelisted_cars").split(",");
 			final String[] blacklistedCarsFilters = tryGet(propertiesPartsObject, "blacklisted_cars").split(",");
@@ -555,6 +574,13 @@ public final class NativeTrainLoader {
 					doorwayObject.addProperty("doorZMultiplier", 0);
 					doorwayObject.add("positionDefinitions", partsObject.getAsJsonArray("positionDefinitions").deepCopy());
 					partsArray.add(doorwayObject);
+
+					Mtr3CompatClient.LOGGER.info("[mtr3compat] DOOR id={} car={}/{} idx={} name={} raw={} mirror={} reversed={} isObj={} flipPos={} | rawPos={} rawPosFlip={} -> xMult={} zMult={} newPos={} newPosFlip={}",
+							id, currentCar + 1, totalCars, index, tryGet(propertiesPartsObject, "name"),
+							tryGet(propertiesPartsObject, "door_offset"), mirror, reversed, isObj, flipPositions,
+							tryGet(propertiesPartsObject, "positions"), tryGet(propertiesPartsObject, "positions_flipped"),
+							doorXMultiplier, doorZMultiplier,
+							positionDefinitionPositionsArray, positionDefinitionPositionsFlippedArray);
 				}
 			}
 		});

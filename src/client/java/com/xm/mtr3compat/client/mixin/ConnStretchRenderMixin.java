@@ -59,6 +59,7 @@ public class ConnStretchRenderMixin {
 			Vector3d ignoredVec, ObjectObjectImmutablePair<?, ?> carPair, double ignoredDouble, int carIndex,
 			DynamicVehicleModel model, CallbackInfo ci) {
 		try {
+			mtr3compat$logCarPose(vehicle, carIndex, carPose, carPair);
 			final ConnStretchRegistry.Entry entry = ConnStretchRegistry.get(vehicle.getHexId(), carIndex);
 			final ConnModelRegistry.Entry connEntry = ConnModelRegistry.get(vehicle.getHexId(), carIndex);
 			if (entry == null && connEntry == null) {
@@ -129,6 +130,35 @@ public class ConnStretchRenderMixin {
 				mtr3compat$loggedFail = true;
 				Mtr3CompatClient.LOGGER.warn("[mtr3compat] drawConnStretchTexture 渲染失败（后续同类错误不再记录）", t);
 			}
+		}
+	}
+
+	private static final java.util.Set<String> mtr3compat$poseLogs = new java.util.HashSet<>();
+
+	/** 每节 compat 原生车厢打印一次世界坐标与朝向，便于把日志里的车厢编号和地图上的实际位置对上。 */
+	private static void mtr3compat$logCarPose(VehicleExtension vehicle, int carIndex, PositionAndRotation carPose, ObjectObjectImmutablePair<?, ?> carPair) {
+		try {
+			final VehicleCar car = (VehicleCar) carPair.left();
+			if (car == null) {
+				return;
+			}
+			final String vehicleId = car.getVehicleId();
+			if (!com.xm.mtr3compat.client.NativeTrainLoader.isNative(vehicleId)) {
+				return;
+			}
+			final String key = vehicle.getHexId() + "#" + carIndex;
+			if (!mtr3compat$poseLogs.add(key)) {
+				return;
+			}
+			Mtr3CompatClient.LOGGER.info("[mtr3compat] POSE id={} car={} hex={} pos=({}, {}, {}) yaw={} pitch={} length={}",
+					vehicleId, carIndex, vehicle.getHexId(),
+					Math.round(carPose.position.x * 1000) / 1000.0,
+					Math.round(carPose.position.y * 1000) / 1000.0,
+					Math.round(carPose.position.z * 1000) / 1000.0,
+					Math.round(carPose.yaw * 1000) / 1000.0,
+					Math.round(carPose.pitch * 1000) / 1000.0,
+					car.getLength());
+		} catch (Throwable ignored) {
 		}
 	}
 
