@@ -402,6 +402,8 @@ public final class NativeTrainLoader {
 	}
 
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
+	private static final boolean SYNTHESIZE_DOORWAY = true;
+
 	private static void processModel(LegacyEntry legacy, String id, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
 		final int[] partIndex = {0};
 		propertiesPartsArray.forEach(jsonElement -> {
@@ -552,7 +554,7 @@ public final class NativeTrainLoader {
 				// doorLeftZ/doorRightZ 两侧独立标量决定。MTR4 必须有 DOORWAY 部件才不走进
 				// VehicleResource 的兜底分支（整节车、两侧、每 1 格全造门洞 → 两侧都开且门被绑到错误切片）。
 				// 这里为每片门扇补一个同坐标系的 DOORWAY，使左右两侧各自独立开门。
-				if (doorXMultiplier != 0 || doorZMultiplier != 0) {
+				if (SYNTHESIZE_DOORWAY && (doorXMultiplier != 0 || doorZMultiplier != 0)) {
 					final JsonObject doorwayObject = new JsonObject();
 					doorwayObject.add("names", partsObject.getAsJsonArray("names").deepCopy());
 					doorwayObject.addProperty("renderStage", partsObject.get("renderStage").getAsString());
