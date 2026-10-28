@@ -23,6 +23,7 @@
 		"PackSelectionScreenMixin",
 		"RawModelSourceLocationMixin",
 		"ResourceManagerHelperMixin",
+		"VehicleConfigCaptureMixin",
 		"VehicleScriptContextConnMixin",
                 "VehicleScriptCarSpaceShiftMixin",
 		"VehicleRailIndexMixin",
