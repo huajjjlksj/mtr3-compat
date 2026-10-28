@@ -510,7 +510,7 @@ public final class NativeTrainLoader {
 					}
 				}
 				partsObject.addProperty("doorXMultiplier", doorXMultiplier);
-				partsObject.addProperty("doorZMultiplier", (isObj ? -1 : 1) * doorZMultiplier);
+				partsObject.addProperty("doorZMultiplier", doorZMultiplier);
 
 				final String positionDefinitionName = "definition_" + Init.randomString();
 				final JsonArray positionDefinitionPositionsArray = new JsonArray();
