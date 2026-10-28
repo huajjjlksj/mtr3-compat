@@ -239,14 +239,14 @@ public final class NativeTrainLoader {
 
 		try {
 			baseObject.addProperty("transportMode", propertiesObject.get("transport_mode").getAsString());
-			length = propertiesObject.get("length").getAsDouble() + 1;
+			length = propertiesObject.get("length").getAsDouble() + LENGTH_EXTRA;
 			width = propertiesObject.get("width").getAsDouble();
 		} catch (Exception ignored1) {
 			try {
 				final String baseTrainType = legacy.baseTrainType().startsWith("base_") ? legacy.baseTrainType().replace("base_", "train_") : legacy.baseTrainType();
 				final String[] baseTrainTypeSplit = baseTrainType.toUpperCase(Locale.ENGLISH).replace("CABLE_CAR", "CABLE-CAR").split("_");
 				baseObject.addProperty("transportMode", baseTrainTypeSplit[0].replace("CABLE-CAR", "CABLE_CAR"));
-				length = Double.parseDouble(baseTrainTypeSplit[1]) + 1;
+				length = Double.parseDouble(baseTrainTypeSplit[1]) + LENGTH_EXTRA;
 				width = Double.parseDouble(baseTrainTypeSplit[2]);
 			} catch (Exception ignored2) {
 			}
@@ -403,6 +403,8 @@ public final class NativeTrainLoader {
 
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
 	private static final boolean SYNTHESIZE_DOORWAY = true;
+	/** 车长附加量：MTR4 上游 LegacyVehicleResource 用 +1；设为 0 可对照 MTR3 的原始 length 语义。 */
+	private static final double LENGTH_EXTRA = 0;
 
 	private static void processModel(LegacyEntry legacy, String id, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
 		final int[] partIndex = {0};
