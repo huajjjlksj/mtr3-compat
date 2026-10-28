@@ -480,25 +480,23 @@ public final class NativeTrainLoader {
 				final double doorXMultiplier;
 				final double doorZMultiplier;
 				if (propertiesPartsObject.has("door_offset")) {
-					// 采用 NTE 的 OBJ 门板语义（DynamicTrainModelLoader L131-136）：左右互换 + 符号取反。
-					//   LEFT_POSITIVE -> RIGHT_NEGATIVE, RIGHT_POSITIVE -> LEFT_NEGATIVE,
-					//   LEFT_NEGATIVE -> RIGHT_POSITIVE, RIGHT_NEGATIVE -> LEFT_POSITIVE
+					// 与 MTR4 上游 LegacyVehicleResource L348-365 完全一致；仅 reversed 模型需要互换（见下方 reversed 分支）。
 					switch (tryGet(propertiesPartsObject, "door_offset").toUpperCase(Locale.ENGLISH)) {
 						case "LEFT_NEGATIVE":
-							doorXMultiplier = mirror ? 1 : -1;
-							doorZMultiplier = doorMax;
+							doorXMultiplier = mirror ? -1 : 1;
+							doorZMultiplier = -doorMax;
 							break;
 						case "RIGHT_NEGATIVE":
-							doorXMultiplier = mirror ? -1 : 1;
-							doorZMultiplier = doorMax;
-							break;
-						case "LEFT_POSITIVE":
 							doorXMultiplier = mirror ? 1 : -1;
 							doorZMultiplier = -doorMax;
 							break;
-						case "RIGHT_POSITIVE":
+						case "LEFT_POSITIVE":
 							doorXMultiplier = mirror ? -1 : 1;
-							doorZMultiplier = -doorMax;
+							doorZMultiplier = doorMax;
+							break;
+						case "RIGHT_POSITIVE":
+							doorXMultiplier = mirror ? 1 : -1;
+							doorZMultiplier = doorMax;
 							break;
 						default:
 							doorXMultiplier = 0;
@@ -531,8 +529,8 @@ public final class NativeTrainLoader {
 							break;
 					}
 				}
-				partsObject.addProperty("doorXMultiplier", doorXMultiplier);
-				partsObject.addProperty("doorZMultiplier", (isObj ? -1 : 1) * doorZMultiplier);
+				partsObject.addProperty("doorXMultiplier", reversed ? -doorXMultiplier : doorXMultiplier);
+				partsObject.addProperty("doorZMultiplier", (isObj ? -1 : 1) * (reversed ? -doorZMultiplier : doorZMultiplier));
 
 				final String positionDefinitionName = "definition_" + Init.randomString();
 				final JsonArray positionDefinitionPositionsArray = new JsonArray();
@@ -543,20 +541,10 @@ public final class NativeTrainLoader {
 				positionDefinitionObject.add("positionsFlipped", reversed ? positionDefinitionPositionsArray : positionDefinitionPositionsFlippedArray);
 				positionDefinitionsArray.add(positionDefinitionObject);
 
-				// 从一手源码推导 OBJ 部件的等价变换（对任意资源包成立，而非拟合单个包）：
-				//   NTE 装载期烘焙（DynamicTrainModelLoader L250-265）：非镜像 v' = v + t3；镜像 v' = Ry(π)·v + (-x,0,z)。
-				//   NTE 渲染（SowcerModelAgent L25-32）：world = M · Rx(π) · v'。
-				//   MTR4 装载（ObjModelLoader 烘焙 Rx(π)）+ addTransformation：world = M · Ry(π·flip) · (Rx(π)·v + t4)。
-				// 令两式恒等：
-				//   非镜像（flip=false）：Rx(π)v + Rx(π)t3 = Rx(π)v + t4   → t4 = (x, 0, -z)
-				//   镜像  （flip=true） ：Rx(π)Ry(π)v + Rx(π)(-x,0,z) = Ry(π)(Rx(π)v + t4) → Ry(π)t4 = (-x,0,-z) → t4 = (x, 0, z)
-				// 即 z 仅在未翻转时取负；翻转条目在 positionsFlipped 中还会被 iteratePositions 对 x 取负，故存 -x。
-				final boolean objOffset = isObj && !propertiesPartsObject.has("display");
-				// flip = 条目最终是否按翻转渲染 = (落在 positionsFlipped) XOR reversed
-				final boolean flipPositions = mirror ^ reversed;
-				final boolean flipPositionsFlipped = !reversed;
-				processPositions(propertiesPartsObject, "positions", reversed, mirror, flipPositions, mirror ? positionDefinitionPositionsFlippedArray : positionDefinitionPositionsArray, objOffset);
-				processPositions(propertiesPartsObject, "positions_flipped", reversed, true, flipPositionsFlipped, positionDefinitionPositionsFlippedArray, objOffset);
+				// 与 MTR4 上游 LegacyVehicleResource L400-410 / L417-427 一致：positions 原样写入
+				// （x 不取负、z 只在 reversed 时取负），翻转由 MTR4 的 iteratePositions 处理。
+				processPositions(propertiesPartsObject, "positions", reversed, mirror ? positionDefinitionPositionsFlippedArray : positionDefinitionPositionsArray);
+				processPositions(propertiesPartsObject, "positions_flipped", reversed, positionDefinitionPositionsFlippedArray);
 
 				addSingleArrayItem(partsObject, "positionDefinitions", positionDefinitionName);
 
@@ -575,25 +563,24 @@ public final class NativeTrainLoader {
 					doorwayObject.add("positionDefinitions", partsObject.getAsJsonArray("positionDefinitions").deepCopy());
 					partsArray.add(doorwayObject);
 
-					Mtr3CompatClient.LOGGER.info("[mtr3compat] DOOR id={} car={}/{} idx={} name={} raw={} mirror={} reversed={} isObj={} flipPos={} | rawPos={} rawPosFlip={} -> xMult={} zMult={} newPos={} newPosFlip={}",
+					Mtr3CompatClient.LOGGER.info("[mtr3compat] DOOR id={} car={}/{} idx={} name={} raw={} mirror={} reversed={} isObj={} | rawPos={} -> xMult={} zMult={} newPos={} newPosFlip={}",
 							id, currentCar + 1, totalCars, index, tryGet(propertiesPartsObject, "name"),
-							tryGet(propertiesPartsObject, "door_offset"), mirror, reversed, isObj, flipPositions,
-							tryGet(propertiesPartsObject, "positions"), tryGet(propertiesPartsObject, "positions_flipped"),
-							doorXMultiplier, doorZMultiplier,
+							tryGet(propertiesPartsObject, "door_offset"), mirror, reversed, isObj,
+							propertiesPartsObject.get("positions"),
+							reversed ? -doorXMultiplier : doorXMultiplier,
+							(isObj ? -1 : 1) * (reversed ? -doorZMultiplier : doorZMultiplier),
 							positionDefinitionPositionsArray, positionDefinitionPositionsFlippedArray);
 				}
 			}
 		});
 	}
 
-	private static void processPositions(JsonObject propertiesPartsObject, String property, boolean reversed, boolean flippedEntry, boolean flip, JsonArray positionDefinitionPositionsArray, boolean objOffset) {
+	private static void processPositions(JsonObject propertiesPartsObject, String property, boolean reversed, JsonArray positionDefinitionPositionsArray) {
 		try {
 			propertiesPartsObject.getAsJsonArray(property).forEach(jsonElement -> {
 				final JsonObject positionDefinitionObject = new JsonObject();
-				final double x = jsonElement.getAsJsonArray().get(0).getAsDouble();
-				final double z = jsonElement.getAsJsonArray().get(1).getAsDouble();
-				positionDefinitionObject.addProperty("x", objOffset ? (flip ? -x : x) : (flippedEntry ? -x : x));
-				positionDefinitionObject.addProperty("z", objOffset ? (flip ? z : -z) : z * (reversed ? -1 : 1));
+				positionDefinitionObject.addProperty("x", jsonElement.getAsJsonArray().get(0).getAsDouble());
+				positionDefinitionObject.addProperty("z", jsonElement.getAsJsonArray().get(1).getAsDouble() * (reversed ? -1 : 1));
 				positionDefinitionPositionsArray.add(positionDefinitionObject);
 			});
 		} catch (Exception ignored) {
