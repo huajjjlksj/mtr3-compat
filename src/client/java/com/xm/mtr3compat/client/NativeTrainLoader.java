@@ -481,6 +481,9 @@ public final class NativeTrainLoader {
 				}
 
 				final boolean mirror = tryGetBoolean(propertiesPartsObject, "mirror");
+				final boolean objOffset = isObj && !propertiesPartsObject.has("display");
+				final boolean flipPositions = mirror ^ reversed;
+				final boolean flipPositionsFlipped = !reversed;
 				final double doorXMultiplier;
 				final double doorZMultiplier;
 				if (propertiesPartsObject.has("door_offset")) {
@@ -533,8 +536,11 @@ public final class NativeTrainLoader {
 							break;
 					}
 				}
+				// 门板滑出方向必须与几何镜像一致：objOffset 已把 OBJ 几何沿 z 镜像过
+				// （非翻转 z 取负、翻转 z 保持），动画项在世界系里不会自动跟随，因此同样按 flip 取反。
+				final double worldDoorZMultiplier = objOffset ? (flipPositions ? doorZMultiplier : -doorZMultiplier) : (isObj ? -1 : 1) * doorZMultiplier;
 				partsObject.addProperty("doorXMultiplier", reversed ? -doorXMultiplier : doorXMultiplier);
-				partsObject.addProperty("doorZMultiplier", (isObj ? -1 : 1) * (reversed ? -doorZMultiplier : doorZMultiplier));
+				partsObject.addProperty("doorZMultiplier", reversed ? -worldDoorZMultiplier : worldDoorZMultiplier);
 
 				final String positionDefinitionName = "definition_" + Init.randomString();
 				final JsonArray positionDefinitionPositionsArray = new JsonArray();
@@ -548,9 +554,6 @@ public final class NativeTrainLoader {
 				// 车厢位移修复：OBJ 部件的坐标需按 flipped 做镜像（非翻转 z 取负、翻转 x 取负），
 				// 使 MTR4 烘焙的 Rx(180) 与资源包原始朝向上台；翻转条目在 positionsFlipped 中
 				// 还会被 iteratePositions 对 x 取负，故存 -x。
-				final boolean objOffset = isObj && !propertiesPartsObject.has("display");
-				final boolean flipPositions = mirror ^ reversed;
-				final boolean flipPositionsFlipped = !reversed;
 				processPositions(propertiesPartsObject, "positions", reversed, mirror, flipPositions, mirror ? positionDefinitionPositionsFlippedArray : positionDefinitionPositionsArray, objOffset);
 				processPositions(propertiesPartsObject, "positions_flipped", reversed, true, flipPositionsFlipped, positionDefinitionPositionsFlippedArray, objOffset);
 
