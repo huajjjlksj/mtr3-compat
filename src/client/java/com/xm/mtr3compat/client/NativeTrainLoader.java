@@ -543,10 +543,14 @@ public final class NativeTrainLoader {
 				positionDefinitionObject.add("positionsFlipped", reversed ? positionDefinitionPositionsArray : positionDefinitionPositionsFlippedArray);
 				positionDefinitionsArray.add(positionDefinitionObject);
 
-				// 与 MTR4 上游 LegacyVehicleResource L400-410 / L417-427 一致：positions 原样写入
-				// （x 不取负、z 只在 reversed 时取负），翻转由 MTR4 的 iteratePositions 处理。
-				processPositions(propertiesPartsObject, "positions", reversed, mirror ? positionDefinitionPositionsFlippedArray : positionDefinitionPositionsArray);
-				processPositions(propertiesPartsObject, "positions_flipped", reversed, positionDefinitionPositionsFlippedArray);
+				// 车厢位移修复：OBJ 部件的坐标需按 flipped 做镜像（非翻转 z 取负、翻转 x 取负），
+				// 使 MTR4 烘焙的 Rx(180) 与资源包原始朝向上台；翻转条目在 positionsFlipped 中
+				// 还会被 iteratePositions 对 x 取负，故存 -x。
+				final boolean objOffset = isObj && !propertiesPartsObject.has("display");
+				final boolean flipPositions = mirror ^ reversed;
+				final boolean flipPositionsFlipped = !reversed;
+				processPositions(propertiesPartsObject, "positions", reversed, mirror, flipPositions, mirror ? positionDefinitionPositionsFlippedArray : positionDefinitionPositionsArray, objOffset);
+				processPositions(propertiesPartsObject, "positions_flipped", reversed, true, flipPositionsFlipped, positionDefinitionPositionsFlippedArray, objOffset);
 
 				addSingleArrayItem(partsObject, "positionDefinitions", positionDefinitionName);
 
@@ -577,12 +581,14 @@ public final class NativeTrainLoader {
 		});
 	}
 
-	private static void processPositions(JsonObject propertiesPartsObject, String property, boolean reversed, JsonArray positionDefinitionPositionsArray) {
+	private static void processPositions(JsonObject propertiesPartsObject, String property, boolean reversed, boolean flippedEntry, boolean flip, JsonArray positionDefinitionPositionsArray, boolean objOffset) {
 		try {
 			propertiesPartsObject.getAsJsonArray(property).forEach(jsonElement -> {
 				final JsonObject positionDefinitionObject = new JsonObject();
-				positionDefinitionObject.addProperty("x", jsonElement.getAsJsonArray().get(0).getAsDouble());
-				positionDefinitionObject.addProperty("z", jsonElement.getAsJsonArray().get(1).getAsDouble() * (reversed ? -1 : 1));
+				final double x = jsonElement.getAsJsonArray().get(0).getAsDouble();
+				final double z = jsonElement.getAsJsonArray().get(1).getAsDouble();
+				positionDefinitionObject.addProperty("x", objOffset ? (flip ? -x : x) : (flippedEntry ? -x : x));
+				positionDefinitionObject.addProperty("z", objOffset ? (flip ? z : -z) : z * (reversed ? -1 : 1));
 				positionDefinitionPositionsArray.add(positionDefinitionObject);
 			});
 		} catch (Exception ignored) {
