@@ -266,9 +266,9 @@ public final class NativeTrainLoader {
 		final double bogiePosition = length < 10 ? 0 : length * 0.34;
 		baseObject.addProperty("bogie1Position", -bogiePosition);
 		baseObject.addProperty("bogie2Position", bogiePosition);
-		// MTR3 语义：间距 = length(=props.length+1) + 0 + 0，车厢几何按槽位建模，禁止按变体位加 padding
-		baseObject.addProperty("couplingPadding1", 0);
-		baseObject.addProperty("couplingPadding2", 0);
+		// 对照：length 留给 MTR4 停靠计算（=props.length），用 couplingPadding 把实际间距补回 +1
+		baseObject.addProperty("couplingPadding1", COUPLING_PADDING);
+		baseObject.addProperty("couplingPadding2", COUPLING_PADDING);
 		final boolean hasGangway = !effectiveGangwayId(legacy).isEmpty();
 		baseObject.addProperty("hasGangway1", hasGangway);
 		baseObject.addProperty("hasGangway2", hasGangway);
@@ -404,7 +404,9 @@ public final class NativeTrainLoader {
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
 	private static final boolean SYNTHESIZE_DOORWAY = true;
 	/** 车长附加量：MTR4 上游 LegacyVehicleResource 用 +1；设为 0 可对照 MTR3 的原始 length 语义。 */
-	private static final double LENGTH_EXTRA = 1;
+	private static final double LENGTH_EXTRA = 0;
+	/** 车钩间隙：两侧各 0.5 使实际间距 = props.length + 1，同时让 length 保持原值用于停靠计算。 */
+	private static final double COUPLING_PADDING = 0.5;
 
 	private static void processModel(LegacyEntry legacy, String id, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
 		final int[] partIndex = {0};
