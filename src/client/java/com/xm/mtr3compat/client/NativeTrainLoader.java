@@ -404,7 +404,7 @@ public final class NativeTrainLoader {
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
 	private static final boolean SYNTHESIZE_DOORWAY = true;
 	/** 车长附加量：MTR4 上游 LegacyVehicleResource 用 +1；设为 0 可对照 MTR3 的原始 length 语义。 */
-	private static final double LENGTH_EXTRA = 0;
+	private static final double LENGTH_EXTRA = 1;
 
 	private static void processModel(LegacyEntry legacy, String id, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
 		final int[] partIndex = {0};
