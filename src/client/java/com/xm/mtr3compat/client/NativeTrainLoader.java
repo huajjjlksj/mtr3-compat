@@ -115,6 +115,7 @@ public final class NativeTrainLoader {
 		NATIVE_IDS.clear();
 		ENTRIES.clear();
 		VEHICLE_PACK.clear();
+		ModelCacheKeepAlive.clear();
 		JcmScriptAlias.invalidate();
 		// 只处理原版资源包管理器真正加载了的包：未启用的包贴图/脚本/JSON 一律读不到，
 		// 注册出来只会造成 "Script ... is missing" 与 null 配置报错。
@@ -278,9 +279,14 @@ public final class NativeTrainLoader {
 		final double finalDoorMax = doorMax;
 		final JsonObject finalPropertiesObject = propertiesObject;
 		Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册原生车型 {} length={} width={} doorMax={} model={}", entry.id, length, width, doorMax, legacy.model());
-		registerVehicle.accept(new VehicleResource(new JsonReader(baseObject),
-				(currentCar, totalCars) -> buildModels(legacy, finalPropertiesObject, finalDoorMax, currentCar, totalCars, entry.id),
-				RESOURCE_PROVIDER));
+		// 用数组持有 resource：MTR 首次构建该组合时回调 supplier，此时才能登记保活（已构建完成，后续只 touch）。
+		final VehicleResource[] resource = new VehicleResource[1];
+		resource[0] = new VehicleResource(new JsonReader(baseObject), (currentCar, totalCars) -> {
+			final ObjectArrayList<VehicleModel> models = buildModels(legacy, finalPropertiesObject, finalDoorMax, currentCar, totalCars, entry.id);
+			ModelCacheKeepAlive.register(resource[0], entry.id, currentCar, totalCars);
+			return models;
+		}, RESOURCE_PROVIDER);
+		registerVehicle.accept(resource[0]);
 	}
 
 	/** 纯脚本车型（MTR3/NTE 的 base_type 写法：无 model、无贴图，车身完全由脚本绘制）。 */

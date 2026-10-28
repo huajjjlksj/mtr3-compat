@@ -292,6 +292,7 @@ public final class MtrClientDataCompat {
 
 	/** 每帧由客户端 tick 调用：定向请求车厂数据，并在 JCM 数据集变化时重建 DATA_CACHE。 */
 	public static void tickEnsureData() {
+		ModelCacheKeepAlive.tick();
 		final MinecraftClientData data = MinecraftClientData.getInstance();
 		if (data != null) {
 			resetAccumulationIfNeeded(data);
