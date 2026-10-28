@@ -510,7 +510,7 @@ public final class NativeTrainLoader {
 					}
 				}
 				partsObject.addProperty("doorXMultiplier", doorXMultiplier);
-				partsObject.addProperty("doorZMultiplier", doorZMultiplier);
+				partsObject.addProperty("doorZMultiplier", (isObj ? -1 : 1) * doorZMultiplier);
 
 				final String positionDefinitionName = "definition_" + Init.randomString();
 				final JsonArray positionDefinitionPositionsArray = new JsonArray();
@@ -521,34 +521,23 @@ public final class NativeTrainLoader {
 				positionDefinitionObject.add("positionsFlipped", reversed ? positionDefinitionPositionsArray : positionDefinitionPositionsFlippedArray);
 				positionDefinitionsArray.add(positionDefinitionObject);
 
-				// 从一手源码推导 OBJ 部件的等价变换（对任意资源包成立，而非拟合单个包）：
-				//   NTE 装载期烘焙（DynamicTrainModelLoader L250-265）：非镜像 v' = v + t3；镜像 v' = Ry(π)·v + (-x,0,z)。
-				//   NTE 渲染（SowcerModelAgent L25-32）：world = M · Rx(π) · v'。
-				//   MTR4 装载（ObjModelLoader 烘焙 Rx(π)）+ addTransformation：world = M · Ry(π·flip) · (Rx(π)·v + t4)。
-				// 令两式恒等：
-				//   非镜像（flip=false）：Rx(π)v + Rx(π)t3 = Rx(π)v + t4   → t4 = (x, 0, -z)
-				//   镜像  （flip=true） ：Rx(π)Ry(π)v + Rx(π)(-x,0,z) = Ry(π)(Rx(π)v + t4) → Ry(π)t4 = (-x,0,-z) → t4 = (x, 0, z)
-				// 即 z 仅在未翻转时取负；翻转条目在 positionsFlipped 中还会被 iteratePositions 对 x 取负，故存 -x。
-				final boolean objOffset = isObj && !propertiesPartsObject.has("display");
-				// flip = 条目最终是否按翻转渲染 = (落在 positionsFlipped) XOR reversed
-				final boolean flipPositions = mirror ^ reversed;
-				final boolean flipPositionsFlipped = !reversed;
-				processPositions(propertiesPartsObject, "positions", reversed, mirror, flipPositions, mirror ? positionDefinitionPositionsFlippedArray : positionDefinitionPositionsArray, objOffset);
-				processPositions(propertiesPartsObject, "positions_flipped", reversed, true, flipPositionsFlipped, positionDefinitionPositionsFlippedArray, objOffset);
+				// 位置完全交给 MTR4 自己的语义处理：x 原样、z 仅在 reversed 时取负。
+				// 翻转（mirror / positions_flipped）不出现在坐标里，而是由 MTR4 把这些条目放进
+				// positionsFlipped 后按 Ry(180) 渲染——预先把 x 取负会造成二次翻转（部件跑到对侧）。
+				processPositions(propertiesPartsObject, "positions", reversed, mirror ? positionDefinitionPositionsFlippedArray : positionDefinitionPositionsArray);
+				processPositions(propertiesPartsObject, "positions_flipped", reversed, positionDefinitionPositionsFlippedArray);
 
 				addSingleArrayItem(partsObject, "positionDefinitions", positionDefinitionName);
 			}
 		});
 	}
 
-	private static void processPositions(JsonObject propertiesPartsObject, String property, boolean reversed, boolean flippedEntry, boolean flip, JsonArray positionDefinitionPositionsArray, boolean objOffset) {
+	private static void processPositions(JsonObject propertiesPartsObject, String property, boolean reversed, JsonArray positionDefinitionPositionsArray) {
 		try {
 			propertiesPartsObject.getAsJsonArray(property).forEach(jsonElement -> {
 				final JsonObject positionDefinitionObject = new JsonObject();
-				final double x = jsonElement.getAsJsonArray().get(0).getAsDouble();
-				final double z = jsonElement.getAsJsonArray().get(1).getAsDouble();
-				positionDefinitionObject.addProperty("x", objOffset ? (flip ? -x : x) : (flippedEntry ? -x : x));
-				positionDefinitionObject.addProperty("z", objOffset ? (flip ? z : -z) : z * (reversed ? -1 : 1));
+				positionDefinitionObject.addProperty("x", jsonElement.getAsJsonArray().get(0).getAsDouble());
+				positionDefinitionObject.addProperty("z", jsonElement.getAsJsonArray().get(1).getAsDouble() * (reversed ? -1 : 1));
 				positionDefinitionPositionsArray.add(positionDefinitionObject);
 			});
 		} catch (Exception ignored) {
