@@ -537,6 +537,22 @@ public final class NativeTrainLoader {
 				processPositions(propertiesPartsObject, "positions_flipped", reversed, true, flipPositionsFlipped, positionDefinitionPositionsFlippedArray, objOffset);
 
 				addSingleArrayItem(partsObject, "positionDefinitions", positionDefinitionName);
+
+				// MTR3 本身没有“门洞”概念（mtr3-src 全库无 doorway 字样），开门与否只由
+				// doorLeftZ/doorRightZ 两侧独立标量决定。MTR4 必须有 DOORWAY 部件才不走进
+				// VehicleResource 的兜底分支（整节车、两侧、每 1 格全造门洞 → 两侧都开且门被绑到错误切片）。
+				// 这里为每片门扇补一个同坐标系的 DOORWAY，使左右两侧各自独立开门。
+				if (doorXMultiplier != 0 || doorZMultiplier != 0) {
+					final JsonObject doorwayObject = new JsonObject();
+					doorwayObject.add("names", partsObject.getAsJsonArray("names").deepCopy());
+					doorwayObject.addProperty("renderStage", partsObject.get("renderStage").getAsString());
+					doorwayObject.addProperty("condition", "NORMAL");
+					doorwayObject.addProperty("type", "DOORWAY");
+					doorwayObject.addProperty("doorXMultiplier", 0);
+					doorwayObject.addProperty("doorZMultiplier", 0);
+					doorwayObject.add("positionDefinitions", partsObject.getAsJsonArray("positionDefinitions").deepCopy());
+					partsArray.add(doorwayObject);
+				}
 			}
 		});
 	}
