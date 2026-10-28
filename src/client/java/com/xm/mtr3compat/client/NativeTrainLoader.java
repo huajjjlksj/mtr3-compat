@@ -461,22 +461,25 @@ public final class NativeTrainLoader {
 				final double doorXMultiplier;
 				final double doorZMultiplier;
 				if (propertiesPartsObject.has("door_offset")) {
+					// 采用 NTE 的 OBJ 门板语义（DynamicTrainModelLoader L131-136）：左右互换 + 符号取反。
+					//   LEFT_POSITIVE -> RIGHT_NEGATIVE, RIGHT_POSITIVE -> LEFT_NEGATIVE,
+					//   LEFT_NEGATIVE -> RIGHT_POSITIVE, RIGHT_NEGATIVE -> LEFT_POSITIVE
 					switch (tryGet(propertiesPartsObject, "door_offset").toUpperCase(Locale.ENGLISH)) {
 						case "LEFT_NEGATIVE":
-							doorXMultiplier = mirror ? -1 : 1;
-							doorZMultiplier = -doorMax;
+							doorXMultiplier = mirror ? 1 : -1;
+							doorZMultiplier = doorMax;
 							break;
 						case "RIGHT_NEGATIVE":
-							doorXMultiplier = mirror ? 1 : -1;
-							doorZMultiplier = -doorMax;
-							break;
-						case "LEFT_POSITIVE":
 							doorXMultiplier = mirror ? -1 : 1;
 							doorZMultiplier = doorMax;
 							break;
-						case "RIGHT_POSITIVE":
+						case "LEFT_POSITIVE":
 							doorXMultiplier = mirror ? 1 : -1;
-							doorZMultiplier = doorMax;
+							doorZMultiplier = -doorMax;
+							break;
+						case "RIGHT_POSITIVE":
+							doorXMultiplier = mirror ? -1 : 1;
+							doorZMultiplier = -doorMax;
 							break;
 						default:
 							doorXMultiplier = 0;
