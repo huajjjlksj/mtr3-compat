@@ -40,8 +40,6 @@ public final class NativeTrainLoader {
 	private static final String[] LEGACY_BARRIERS = {"london_underground_d78", "mlr", "r179"};
 
 	private static final ObjectOpenHashSet<String> NATIVE_IDS = new ObjectOpenHashSet<>();
-	/** 条目声明了 model/贴图/属性，但已启用资源包里实际不存在这些文件：无法渲染，故不注册（选车列表里也不会出现）。 */
-	private static final ObjectOpenHashSet<String> BROKEN_IDS = new ObjectOpenHashSet<>();
 	private static final ObjectArrayList<NativeEntry2> ENTRIES = new ObjectArrayList<>();
 	/** 原生注册的车型 id -> 来源资源包名（不含 .zip），供按包区分的渲染校正使用。 */
 	private static final java.util.HashMap<String, String> VEHICLE_PACK = new java.util.HashMap<>();
@@ -99,7 +97,7 @@ public final class NativeTrainLoader {
 		return NATIVE_IDS.size();
 	}
 
-	/** LegacyVehicleResource 生成的 4 变体 id 是否属于已原生注册或已判定资源缺失的车型（应抑制）。 */
+	/** LegacyVehicleResource 生成的 4 变体 id 是否属于已原生注册的车型（应抑制）。 */
 	public static boolean shouldSuppress(String variantId) {
 		if (!variantId.startsWith(VARIANTS_PREFIX)) {
 			return false;
@@ -107,7 +105,7 @@ public final class NativeTrainLoader {
 		for (final String suffix : VARIATION_SUFFIXES) {
 			if (variantId.endsWith(suffix)) {
 				final String base = variantId.substring(VARIANTS_PREFIX.length(), variantId.length() - suffix.length());
-				if (NATIVE_IDS.contains(base) || BROKEN_IDS.contains(base)) {
+				if (NATIVE_IDS.contains(base)) {
 					return true;
 				}
 			}
@@ -118,7 +116,6 @@ public final class NativeTrainLoader {
 	/** CustomResourceLoader.reload HEAD：直接读磁盘收集勾选（MTR3 模式）资源包的 custom_trains 条目。 */
 	public static void scan() {
 		NATIVE_IDS.clear();
-		BROKEN_IDS.clear();
 		ENTRIES.clear();
 		VEHICLE_PACK.clear();
 		JcmScriptAlias.invalidate();
@@ -182,24 +179,22 @@ public final class NativeTrainLoader {
 	private static void registerOne(NativeEntry2 entry, Consumer<VehicleResource> registerVehicle) {
 		final LegacyEntry legacy = new LegacyEntry(new JsonReader(entry.json));
 		final boolean scriptOnly = isScriptOnly(legacy);
-		final String missingResource = scriptOnly ? null : firstMissingResource(legacy);
-		if (missingResource != null) {
-			BROKEN_IDS.add(entry.id);
-			Mtr3CompatClient.LOGGER.warn("[mtr3compat] 资源包缺少文件，隐藏该车型: {} -> {}", entry.id, missingResource);
-			return;
-		}
 
-		JsonObject propertiesObject;
+		final JsonObject propertiesObject;
 		if (scriptOnly) {
 			// 纯脚本车型：无 model/贴图，靠 base_type 提供尺寸，车身由脚本绘制，属性只需空 parts。
 			propertiesObject = new JsonObject();
 			propertiesObject.add("parts", new JsonArray());
 		} else {
-			propertiesObject = legacy.modelProperties().isEmpty() ? null : Utilities.parseJson(RESOURCE_PROVIDER.get(new Identifier(legacy.modelProperties())));
-			if (propertiesObject == null || !propertiesObject.has("parts")) {
-				BROKEN_IDS.add(entry.id);
-				Mtr3CompatClient.LOGGER.warn("[mtr3compat] 缺少可用模型属性，隐藏该车型: {} -> {}", entry.id, legacy.modelProperties());
-				return;
+			final JsonObject parsedProperties = legacy.modelProperties().isEmpty() ? null : Utilities.parseJson(RESOURCE_PROVIDER.get(new Identifier(legacy.modelProperties())));
+			if (parsedProperties == null || !parsedProperties.has("parts")) {
+				// 与 MTR3 一致：属性不可用时按空部件注册（车型仍出现在列表里，不隐藏）。
+				Mtr3CompatClient.LOGGER.warn("[mtr3compat] 缺少可用模型属性，按空部件注册: {} -> {}", entry.id, legacy.modelProperties());
+				final JsonObject emptyProperties = new JsonObject();
+				emptyProperties.add("parts", new JsonArray());
+				propertiesObject = emptyProperties;
+			} else {
+				propertiesObject = parsedProperties;
 			}
 		}
 
@@ -295,43 +290,6 @@ public final class NativeTrainLoader {
 	/** 纯脚本车型（MTR3/NTE 的 base_type 写法：无 model、无贴图，车身完全由脚本绘制）。 */
 	private static boolean isScriptOnly(LegacyEntry legacy) {
 		return legacy.model().isEmpty() && !legacy.baseTrainType().isEmpty();
-	}
-
-	/** 第一条在已启用资源包里找不到的文件（model / 属性 / 贴图）；全部存在返回 null。 */
-	private static String firstMissingResource(LegacyEntry legacy) {
-		// MTR3 的 model 字段通常不带扩展名（实际文件是 .obj 或 .bbmodel），属性 json 也可能省略 .json
-		if (!legacy.model().isEmpty() && !resourceExistsAny(legacy.model(), ".obj", ".bbmodel")) {
-			return legacy.model();
-		}
-		if (!legacy.modelProperties().isEmpty() && !resourceExistsAny(legacy.modelProperties(), ".json")) {
-			return legacy.modelProperties();
-		}
-		if (!legacy.textureId().isEmpty() && !resourceExistsAny(legacy.textureId(), ".png")) {
-			return legacy.textureId();
-		}
-		return null;
-	}
-
-	/** 给定资源路径或路径前缀，任一候选（含各扩展名）存在即视为存在。 */
-	private static boolean resourceExistsAny(String resource, String... suffixes) {
-		if (resourceExists(resource)) {
-			return true;
-		}
-		for (final String suffix : suffixes) {
-			if (resourceExists(resource + suffix)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private static boolean resourceExists(String resource) {
-		final Minecraft client = Minecraft.getInstance();
-		if (client == null || client.getResourceManager() == null) {
-			return true;
-		}
-		final ResourceLocation identifier = ResourceLocation.tryParse(resource);
-		return identifier == null || client.getResourceManager().getResource(identifier).isPresent();
 	}
 
 	/** 声明了风挡连接但未给贴图的车型，回退到 MTR 内置 sp1900 风挡（`mtr:textures/gangway/sp1900_*`）。 */
