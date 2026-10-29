@@ -33,7 +33,10 @@ public class CustomResourceLoaderMixin {
 		NativeRailLoader.register((id, railResource) -> {
 			mtr3compat$rails().add(railResource);
 			mtr3compat$railsCache().put(id, railResource);
-		}, id -> mtr3compat$railsCache().containsKey(id));
+		}, id -> mtr3compat$railsCache().containsKey(id), id -> {
+			mtr3compat$railsCache().remove(id);
+			mtr3compat$rails().removeIf(railResource -> railResource.getId().equals(id));
+		});
 		final int[] trainCount = {0};
 		CustomResourceLoader.iterateVehicles(TransportMode.TRAIN, vehicleResource -> trainCount[0]++);
 		Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册完成: TRAIN 车型={} 轨道样式={} 原生车型={}",

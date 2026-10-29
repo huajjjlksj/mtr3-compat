@@ -23,7 +23,7 @@ import java.util.function.BiConsumer;
  * MTR4 只读 {@code mtr_custom_resources.json} 的 rails 数组，因此这些轨道在 MTR4 里完全不存在。
  * 这里在资源重载时把同样的定义注册成 MTR4 的 {@link RailResource}，字段对应关系：
  * id→id、name→name、model→modelResource、textureId→textureResource、flipV→flipTextureV、
- * repeatInterval→repeatInterval（缺省 0.5，与 NTE 一致）、yOffset→modelYOffset。
+ * yOffset→modelYOffset，铺设间距固定为 NTE 的 0.5m（JSON 的 repeatInterval 在 NTE 里不改变间距）。
  * NTE 额外支持 Sowcer CSV 模型，MTR4 只认 obj/mqo/mqoz：CSV 在注册时转换成 OBJ/MTL 文本，
  * 由本类的 ResourceProvider 以同目录同名 .obj/.mtl 的形式提供给 MTR4。
  */
@@ -31,6 +31,8 @@ public final class NativeRailLoader {
 
 	private static final String RAILS_PREFIX = "assets/mtrsteamloco/rails/";
 	private static final String DEFAULT_COLOR = "777777";
+	/** NTE 实际铺设间距（固定 0.5m），见 buildRailObject 注释。 */
+	private static final double NTE_REPEAT_INTERVAL = 0.5;
 
 	/** 虚拟模型标识符（小写）→ 文本内容，供 MTR4 解析 CSV 转换结果。 */
 	private static final Map<String, String> VIRTUAL = new HashMap<>();
@@ -124,7 +126,8 @@ public final class NativeRailLoader {
 			return;
 		}
 		final String model = formatModelIdentifier(railObject.get("model").getAsString());
-		String modelResource = model;
+		final String modelResource;
+		final String modelContent;
 		if (model.toLowerCase(Locale.ENGLISH).endsWith(".csv")) {
 			final byte[] csvBytes = Mtr3CompatPacks.readPackFile(packPath, toPackPath(model));
 			if (csvBytes == null) {
@@ -134,32 +137,86 @@ public final class NativeRailLoader {
 			final String fileName = model.substring(model.lastIndexOf('/') + 1, model.length() - ".csv".length());
 			final CsvModelConverter.Result converted = CsvModelConverter.convert(new String(csvBytes, StandardCharsets.UTF_8), fileName);
 			modelResource = model.substring(0, model.length() - ".csv".length()) + ".obj";
-			VIRTUAL.put(modelResource.toLowerCase(Locale.ENGLISH), converted.objContent);
 			VIRTUAL.put(modelResource.substring(0, modelResource.length() - ".obj".length()).toLowerCase(Locale.ENGLISH) + ".mtl", converted.mtlContent);
-		} else if (Mtr3CompatPacks.readPackFile(packPath, toPackPath(model)) == null) {
-			Mtr3CompatClient.LOGGER.warn("[mtr3compat] NTE 轨道模型缺失，已跳过: {} -> {}", id, model);
-			return;
+			modelContent = mtr3compat$flipX180(converted.objContent);
+		} else {
+			final byte[] modelBytes = Mtr3CompatPacks.readPackFile(packPath, toPackPath(model));
+			if (modelBytes == null) {
+				Mtr3CompatClient.LOGGER.warn("[mtr3compat] NTE 轨道模型缺失，已跳过: {} -> {}", id, model);
+				return;
+			}
+			modelResource = model;
+			modelContent = mtr3compat$flipX180(new String(modelBytes, StandardCharsets.UTF_8));
 		}
+		VIRTUAL.put(modelResource.toLowerCase(Locale.ENGLISH), modelContent);
 		ENTRIES.add(new RailEntry(id, railObject, modelResource));
 	}
 
-	/** CustomResourceLoader.reload TAIL：注册为 MTR4 轨道（id 已存在时跳过，不覆盖原版/MTR 包轨道）。 */
-	public static void register(BiConsumer<String, RailResource> adder, java.util.function.Predicate<String> idExists) {
-		final int[] count = {0};
-		for (final RailEntry entry : ENTRIES) {
-			if (idExists.test(entry.id)) {
-				Mtr3CompatClient.LOGGER.warn("[mtr3compat] NTE 轨道 id 与已有轨道重复，已跳过: {}", entry.id);
-				continue;
+	/**
+	 * 绕 X 轴旋转 180°（x 不变，y、z 取反）：NTE 与 MTR4 对轨道模型的竖直约定相反。
+	 * NTE 直接 rotateX(-pitch)，模型 y 向上为正；MTR4 是 rotateX(π - pitch)，等于在 NTE 结果上再翻 180°，
+	 * 导致 NTE 模型的顶部（轨道/梁）朝下、上下颠倒。这里预先翻转几何，抵消 MTR4 的 π 旋转。
+	 * 同时翻转 v 与 vn 的 y/z 分量，绕 X 旋转保持面朝向（行列式 = +1），不会出现背面剔除问题。
+	 */
+	private static String mtr3compat$flipX180(String objContent) {
+		final StringBuilder builder = new StringBuilder(objContent.length());
+		for (final String line : objContent.split("\n", -1)) {
+			if (line.startsWith("v ")) {
+				final String[] parts = line.split(" ");
+				if (parts.length >= 4) {
+					builder.append("v ").append(parts[1]).append(' ')
+							.append(mtr3compat$negate(parts[2])).append(' ')
+							.append(mtr3compat$negate(parts[3]));
+					for (int i = 4; i < parts.length; i++) {
+						builder.append(' ').append(parts[i]);
+					}
+					builder.append('\n');
+					continue;
+				}
+			} else if (line.startsWith("vn ")) {
+				final String[] parts = line.split(" ");
+				if (parts.length >= 4) {
+					builder.append("vn ").append(parts[1]).append(' ')
+							.append(mtr3compat$negate(parts[2])).append(' ')
+							.append(mtr3compat$negate(parts[3])).append('\n');
+					continue;
+				}
 			}
+			builder.append(line).append('\n');
+		}
+		return builder.toString();
+	}
+
+	private static String mtr3compat$negate(String value) {
+		try {
+			final double parsed = Double.parseDouble(value);
+			final double negated = parsed == 0 ? 0 : -parsed;
+			// 去掉多余的尾随 0，保持 obj 文本紧凑
+			final String text = String.valueOf(negated);
+			return text.endsWith(".0") ? text.substring(0, text.length() - 2) : text;
+		} catch (NumberFormatException e) {
+			return value;
+		}
+	}
+
+	/** CustomResourceLoader.reload TAIL：注册为 MTR4 轨道。同名轨道（MTR4 自带的 NTE 转换结果、其它包）会被本实现替换。 */
+	public static void register(BiConsumer<String, RailResource> adder, java.util.function.Predicate<String> idExists, java.util.function.Consumer<String> remover) {
+		int added = 0;
+		int replaced = 0;
+		for (final RailEntry entry : ENTRIES) {
 			try {
+				if (idExists.test(entry.id)) {
+					remover.accept(entry.id);
+					replaced++;
+				}
 				adder.accept(entry.id, new RailResource(new JsonReader(buildRailObject(entry)), RESOURCE_PROVIDER));
-				count[0]++;
+				added++;
 			} catch (Exception e) {
 				Mtr3CompatClient.LOGGER.warn("[mtr3compat] NTE 轨道注册失败: " + entry.id, e);
 			}
 		}
-		if (count[0] > 0) {
-			Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册 NTE 轨道 {} 条（其中 CSV 转换 {} 条）", count[0], VIRTUAL.size() / 2);
+		if (added > 0) {
+			Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册 NTE 轨道 {} 条（替换同名 {} 条，CSV 转换 {} 条）", added, replaced, VIRTUAL.size() / 2);
 		}
 	}
 
@@ -171,7 +228,10 @@ public final class NativeRailLoader {
 		json.addProperty("modelResource", entry.modelResource);
 		json.addProperty("textureResource", entry.json.has("textureId") ? entry.json.get("textureId").getAsString() : "");
 		json.addProperty("flipTextureV", entry.json.has("flipV") && entry.json.get("flipV").getAsBoolean());
-		json.addProperty("repeatInterval", entry.json.has("repeatInterval") ? entry.json.get("repeatInterval").getAsDouble() : 0.5);
+		// NTE 铺设模型时固定用 0.5：BakedRail 调用 rail.render(..., 0, 0)，RailMath 在 interval <= 0 时取 0.5，
+		// JSON 里的 repeatInterval 只参与俯仰角计算，并不改变间距。MTR4 则直接把 repeatInterval 当作铺设间距，
+		// 照搬会让按 NTE 0.5 间距制作的模型之间露出空隙（轨道看起来一块一块断开）。这里按 NTE 的实际间距 0.5 注册。
+		json.addProperty("repeatInterval", NTE_REPEAT_INTERVAL);
 		json.addProperty("modelYOffset", entry.json.has("yOffset") ? entry.json.get("yOffset").getAsDouble() : 0);
 		return json;
 	}
