@@ -402,16 +402,13 @@ public final class NativeTrainLoader {
 	}
 
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
-	private static final boolean SYNTHESIZE_DOORWAY = true;
 	/** 车长附加量：MTR4 上游 LegacyVehicleResource 用 +1；设为 0 可对照 MTR3 的原始 length 语义。 */
 	private static final double LENGTH_EXTRA = 0;
 	/** 车钩间隙：两侧各 0.5 使实际间距 = props.length + 1，同时让 length 保持原值用于停靠计算。 */
 	private static final double COUPLING_PADDING = 0.5;
 
 	private static void processModel(LegacyEntry legacy, String id, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
-		final int[] partIndex = {0};
 		propertiesPartsArray.forEach(jsonElement -> {
-			final int index = partIndex[0]++;
 			final JsonObject propertiesPartsObject = jsonElement.getAsJsonObject();
 			final String[] whitelistedCarsFilters = tryGet(propertiesPartsObject, "whitelisted_cars").split(",");
 			final String[] blacklistedCarsFilters = tryGet(propertiesPartsObject, "blacklisted_cars").split(",");
@@ -560,30 +557,6 @@ public final class NativeTrainLoader {
 				processPositions(propertiesPartsObject, "positions_flipped", reversed, true, flipPositionsFlipped, positionDefinitionPositionsFlippedArray, objOffset);
 
 				addSingleArrayItem(partsObject, "positionDefinitions", positionDefinitionName);
-
-				// MTR3 本身没有“门洞”概念（mtr3-src 全库无 doorway 字样），开门与否只由
-				// doorLeftZ/doorRightZ 两侧独立标量决定。MTR4 必须有 DOORWAY 部件才不走进
-				// VehicleResource 的兜底分支（整节车、两侧、每 1 格全造门洞 → 两侧都开且门被绑到错误切片）。
-				// 这里为每片门扇补一个同坐标系的 DOORWAY，使左右两侧各自独立开门。
-				if (SYNTHESIZE_DOORWAY && (doorXMultiplier != 0 || doorZMultiplier != 0)) {
-					final JsonObject doorwayObject = new JsonObject();
-					doorwayObject.add("names", partsObject.getAsJsonArray("names").deepCopy());
-					doorwayObject.addProperty("renderStage", partsObject.get("renderStage").getAsString());
-					doorwayObject.addProperty("condition", "NORMAL");
-					doorwayObject.addProperty("type", "DOORWAY");
-					doorwayObject.addProperty("doorXMultiplier", 0);
-					doorwayObject.addProperty("doorZMultiplier", 0);
-					doorwayObject.add("positionDefinitions", partsObject.getAsJsonArray("positionDefinitions").deepCopy());
-					partsArray.add(doorwayObject);
-
-					Mtr3CompatClient.LOGGER.info("[mtr3compat] DOOR id={} car={}/{} idx={} name={} raw={} mirror={} reversed={} isObj={} | rawPos={} -> xMult={} zMult={} newPos={} newPosFlip={}",
-							id, currentCar + 1, totalCars, index, tryGet(propertiesPartsObject, "name"),
-							tryGet(propertiesPartsObject, "door_offset"), mirror, reversed, isObj,
-							propertiesPartsObject.get("positions"),
-							reversed ? -doorXMultiplier : doorXMultiplier,
-							(isObj ? -1 : 1) * (reversed ? -doorZMultiplier : doorZMultiplier),
-							positionDefinitionPositionsArray, positionDefinitionPositionsFlippedArray);
-				}
 			}
 		});
 	}
