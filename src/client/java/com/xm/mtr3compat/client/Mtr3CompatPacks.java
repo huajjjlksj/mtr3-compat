@@ -98,6 +98,40 @@ public final class Mtr3CompatPacks {
 		}
 	}
 
+	/** 列出资源包内以 prefix 开头、以 suffix 结尾的条目名（zip 与目录包统一用正斜杠，不含目录条目）。 */
+	public static ObjectArrayList<String> listPackFiles(Path packPath, String prefix, String suffix) {
+		final ObjectArrayList<String> result = new ObjectArrayList<>();
+		try {
+			if (Files.isDirectory(packPath)) {
+				final Path dir = packPath.resolve(prefix.replace('/', java.io.File.separatorChar));
+				if (Files.isDirectory(dir)) {
+					try (final Stream<Path> stream = Files.walk(dir)) {
+						stream.filter(Files::isRegularFile).forEach(file -> {
+							final String relative = packPath.relativize(file).toString().replace(java.io.File.separatorChar, '/');
+							if (relative.startsWith(prefix) && relative.endsWith(suffix)) {
+								result.add(relative);
+							}
+						});
+					}
+				}
+			} else {
+				try (final ZipFile zipFile = new ZipFile(packPath.toFile())) {
+					final java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+					while (entries.hasMoreElements()) {
+						final ZipEntry entry = entries.nextElement();
+						final String name = entry.getName();
+						if (!entry.isDirectory() && name.startsWith(prefix) && name.endsWith(suffix)) {
+							result.add(name);
+						}
+					}
+				}
+			}
+		} catch (IOException e) {
+			Mtr3CompatClient.LOGGER.warn("[mtr3compat] 列出资源包条目失败: " + packPath, e);
+		}
+		return result;
+	}
+
 	public static String packBaseName(Path path) {
 		final String name = path.getFileName().toString();
 		return Mtr3CompatConfig.normalize(name);
