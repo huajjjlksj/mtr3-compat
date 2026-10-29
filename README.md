@@ -105,3 +105,4 @@ src/client/java/com/xm/mtr3compat/client/
 - 感谢 Minecraft Transit Railway、Joban Client Mod 作者及各类资源包作者。
 - 本项目不包含任何资源包内容，也不附带 MTR / JCM 的二进制文件。
 - 模组元数据中声明的许可证为 MIT。
+
