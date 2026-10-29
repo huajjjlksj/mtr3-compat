@@ -402,10 +402,10 @@ public final class NativeTrainLoader {
 	}
 
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
-	/** 车长附加量：MTR4 上游 LegacyVehicleResource 用 +1；设为 0 可对照 MTR3 的原始 length 语义。 */
-	private static final double LENGTH_EXTRA = 0;
-	/** 车钩间隙：两侧各 0.5 使实际间距 = props.length + 1，同时让 length 保持原值用于停靠计算。 */
-	private static final double COUPLING_PADDING = 0.5;
+	/** 车长附加量：MTR3 的车体几何比 length 多 1 格，与 MTR4 上游 LegacyVehicleResource 的 +1 一致。 */
+	private static final double LENGTH_EXTRA = 1;
+	/** 车钩间隙：间距已由 length 的 +1 补齐，不再额外加 padding（否则车体会比模型短 1 格而重叠）。 */
+	private static final double COUPLING_PADDING = 0;
 
 	private static void processModel(LegacyEntry legacy, String id, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
 		propertiesPartsArray.forEach(jsonElement -> {
