@@ -18,8 +18,8 @@ public class Mtr3CompatClient implements ClientModInitializer {
 	 */
 	public static volatile boolean SPOOF_MTR_VERSION = false;
 
-	/** 调试用：重喂窗口内把脚本里的空 catch 替换为一次性 print，暴露被吞掉的脚本异常（诊断完改回 false）。 */
-	public static final boolean DEBUG_INSTRUMENT_CATCH = true;
+	/** 调试用：重喂窗口内把脚本里的空 catch 替换为一次性 print，暴露被吞掉的脚本异常。默认关闭，排查脚本问题时再临时打开。 */
+	public static final boolean DEBUG_INSTRUMENT_CATCH = false;
 
 	/** 原版资源包界面关闭时，原版是否已经自己触发过重载（避免模组重复拉起重载）。 */
 	public static boolean vanillaReloaded = false;
