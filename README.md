@@ -23,15 +23,15 @@
 
 ## 环境要求
 
-> **注意：本分支版本仅支持 JCM 2.3.0-prerelease.1 与 2.3.0-prerelease.2。** 其他 JCM 版本（含 beta 系列与后续版本）未适配，可能导致启动崩溃。
+> **注意：新版脚本补丁会按运行时 JCM 的 `parseScriptEvent` 签名自动开关。** JCM 2.3.0-prerelease.1 及之后（含 beta.3）启用；2.3.0-beta.2 及更早自动关闭，避免解析事件监听抛 `ClassCastException`。
 
 | 项目 | 要求 |
 | --- | --- |
 | Minecraft | 1.20.1 |
-| 加载器 | Fabric Loader（≥ 0.14.21） |
+| 加载器 | Fabric Loader（≥ 0.19.5） |
 | 前置 | Fabric API |
 | 前置 | Minecraft Transit Railway **4.0.5+**（fabric） |
-| 前置 | Joban Client Mod **2.3.0-prerelease.1 / 2.3.0-prerelease.2**（mod id `jsblock`，**仅这两个版本**） |
+| 前置 | Joban Client Mod **2.3.0-prerelease.1+**（mod id `jsblock`；beta.2 及更早会关闭新版脚本补丁） |
 | Java | 17+ |
 | 侧别 | **仅客户端**（服务器无需安装） |
 

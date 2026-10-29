@@ -16,6 +16,10 @@ public class ScriptInstanceManagerMixin {
 
 	@Inject(method = "getInstance(Lcom/lx862/mtrscripting/core/primitive/UniqueKey;Ljava/util/function/Supplier;)Lcom/lx862/mtrscripting/core/primitive/ScriptInstance;", at = @At("RETURN"), remap = false)
 	private void mtr3compat$addTrainEntries(UniqueKey key, Supplier<?> supplier, CallbackInfoReturnable<ScriptInstance<?>> callback) {
+		if (!com.xm.mtr3compat.client.JcmScriptApi.supportsParsedScriptListener()) {
+			// 旧版 JCM（beta.2 及更早）字段布局不同，列车级脚本入口补丁自动关闭
+			return;
+		}
 		TrainScriptSupport.ensureTrainEntries(callback.getReturnValue());
 	}
 }

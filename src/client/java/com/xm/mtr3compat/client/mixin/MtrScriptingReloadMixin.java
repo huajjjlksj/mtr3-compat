@@ -44,8 +44,9 @@ public class MtrScriptingReloadMixin {
 			final java.lang.reflect.Field field = com.lx862.mtrscripting.core.rhinojs.RhinoParsedScript.class.getDeclaredField("scope");
 			field.setAccessible(true);
 			return field;
-		} catch (NoSuchFieldException e) {
-			throw new ExceptionInInitializerError(e);
+		} catch (Throwable e) {
+			// 旧版 JCM 字段布局可能不同：返回 null，由调用处跳过绑定
+			return null;
 		}
 	}
 
@@ -87,6 +88,10 @@ public class MtrScriptingReloadMixin {
 			Mtr3CompatClient.LOGGER.info("[mtr3compat] ClassShutter deny 移除 {} 条（reflect/Class）", before - denied.size());
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] ClassShutter deny 移除失败", e);
+		}
+		if (!com.xm.mtr3compat.client.JcmScriptApi.supportsParsedScriptListener() || SCOPE_FIELD == null) {
+			// beta.2 及更早的 parseScriptEvent 是 TriConsumer 签名，注册 BiConsumer 监听会在 invoke 时抛 ClassCastException
+			return;
 		}
 		final java.util.function.BiConsumer<String, com.lx862.mtrscripting.core.primitive.ParsedScript> override =
 				(name, script) -> {
