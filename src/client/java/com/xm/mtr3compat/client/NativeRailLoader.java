@@ -12,18 +12,22 @@ import org.mtr.mod.resource.ResourceProvider;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * NTE（mtrsteamloco）轨道加载：NTE 扫描 {@code assets/mtrsteamloco/rails/*.json} 注册自己的轨道渲染，
- * MTR4 只读 {@code mtr_custom_resources.json} 的 rails 数组，因此这些轨道在 MTR4 里完全不存在。
- * 这里在资源重载时把同样的定义注册成 MTR4 的 {@link RailResource}，字段对应关系：
- * id→id、name→name、model→modelResource、textureId→textureResource、flipV→flipTextureV、
- * yOffset→modelYOffset，铺设间距固定为 NTE 的 0.5m（JSON 的 repeatInterval 在 NTE 里不改变间距）。
+ * MTR4 只读 {@code mtr_custom_resources.json} 的 rails 数组，因此这些轨道在 MTR4 里只能靠它自带的
+ * Legacy 转换，CSV 模型更是完全没有。这里在资源重载时把同样的定义注册成 MTR4 的 {@link RailResource}，
+ * 字段对应：id→id、name→name、model→modelResource、textureId→textureResource、flipV→flipTextureV、
+ * yOffset→modelYOffset，铺设间距固定为 NTE 实际的 0.5m（JSON 的 repeatInterval 在 NTE 里不参与间距）。
  * NTE 额外支持 Sowcer CSV 模型，MTR4 只认 obj/mqo/mqoz：CSV 在注册时转换成 OBJ/MTL 文本，
  * 由本类的 ResourceProvider 以同目录同名 .obj/.mtl 的形式提供给 MTR4。
  */
@@ -49,7 +53,7 @@ public final class NativeRailLoader {
 		}
 	}
 
-	private static final java.util.List<RailEntry> ENTRIES = new java.util.ArrayList<>();
+	private static final List<RailEntry> ENTRIES = new ArrayList<>();
 
 	/** 先查 CSV 转换出的虚拟文件，再落到资源包真实文件。 */
 	private static final ResourceProvider RESOURCE_PROVIDER = new ResourceProvider() {
@@ -138,7 +142,7 @@ public final class NativeRailLoader {
 			final CsvModelConverter.Result converted = CsvModelConverter.convert(new String(csvBytes, StandardCharsets.UTF_8), fileName);
 			modelResource = model.substring(0, model.length() - ".csv".length()) + ".obj";
 			VIRTUAL.put(modelResource.substring(0, modelResource.length() - ".obj".length()).toLowerCase(Locale.ENGLISH) + ".mtl", converted.mtlContent);
-			modelContent = mtr3compat$flipX180(converted.objContent);
+			modelContent = converted.objContent;
 		} else {
 			final byte[] modelBytes = Mtr3CompatPacks.readPackFile(packPath, toPackPath(model));
 			if (modelBytes == null) {
@@ -146,61 +150,19 @@ public final class NativeRailLoader {
 				return;
 			}
 			modelResource = model;
-			modelContent = mtr3compat$flipX180(new String(modelBytes, StandardCharsets.UTF_8));
+			modelContent = new String(modelBytes, StandardCharsets.UTF_8);
 		}
 		VIRTUAL.put(modelResource.toLowerCase(Locale.ENGLISH), modelContent);
 		ENTRIES.add(new RailEntry(id, railObject, modelResource));
 	}
 
 	/**
-	 * 绕 X 轴旋转 180°（x 不变，y、z 取反）：NTE 与 MTR4 对轨道模型的竖直约定相反。
-	 * NTE 直接 rotateX(-pitch)，模型 y 向上为正；MTR4 是 rotateX(π - pitch)，等于在 NTE 结果上再翻 180°，
-	 * 导致 NTE 模型的顶部（轨道/梁）朝下、上下颠倒。这里预先翻转几何，抵消 MTR4 的 π 旋转。
-	 * 同时翻转 v 与 vn 的 y/z 分量，绕 X 旋转保持面朝向（行列式 = +1），不会出现背面剔除问题。
+	 * 不额外做几何变换：MTR4 的 OBJ 加载器（OptimizedModel$ObjModel.loadModel）会先给每个 mesh 做一次
+	 * 绕 X 轴 180° 旋转，RenderRails 再按 rotateX(π - pitch) 渲染，两次抵消后等价于 NTE 的 rotateX(-pitch)；
+	 * 若在这里再翻转一次，模型会被挪到轨道线下方，表现为整段轨道下沉。
+	 * CustomResourceLoader.reload TAIL：注册为 MTR4 轨道。同名轨道（MTR4 自带的 NTE 转换结果、其它包）会被本实现替换。
 	 */
-	private static String mtr3compat$flipX180(String objContent) {
-		final StringBuilder builder = new StringBuilder(objContent.length());
-		for (final String line : objContent.split("\n", -1)) {
-			if (line.startsWith("v ")) {
-				final String[] parts = line.split(" ");
-				if (parts.length >= 4) {
-					builder.append("v ").append(parts[1]).append(' ')
-							.append(mtr3compat$negate(parts[2])).append(' ')
-							.append(mtr3compat$negate(parts[3]));
-					for (int i = 4; i < parts.length; i++) {
-						builder.append(' ').append(parts[i]);
-					}
-					builder.append('\n');
-					continue;
-				}
-			} else if (line.startsWith("vn ")) {
-				final String[] parts = line.split(" ");
-				if (parts.length >= 4) {
-					builder.append("vn ").append(parts[1]).append(' ')
-							.append(mtr3compat$negate(parts[2])).append(' ')
-							.append(mtr3compat$negate(parts[3])).append('\n');
-					continue;
-				}
-			}
-			builder.append(line).append('\n');
-		}
-		return builder.toString();
-	}
-
-	private static String mtr3compat$negate(String value) {
-		try {
-			final double parsed = Double.parseDouble(value);
-			final double negated = parsed == 0 ? 0 : -parsed;
-			// 去掉多余的尾随 0，保持 obj 文本紧凑
-			final String text = String.valueOf(negated);
-			return text.endsWith(".0") ? text.substring(0, text.length() - 2) : text;
-		} catch (NumberFormatException e) {
-			return value;
-		}
-	}
-
-	/** CustomResourceLoader.reload TAIL：注册为 MTR4 轨道。同名轨道（MTR4 自带的 NTE 转换结果、其它包）会被本实现替换。 */
-	public static void register(BiConsumer<String, RailResource> adder, java.util.function.Predicate<String> idExists, java.util.function.Consumer<String> remover) {
+	public static void register(BiConsumer<String, RailResource> adder, Predicate<String> idExists, Consumer<String> remover) {
 		int added = 0;
 		int replaced = 0;
 		for (final RailEntry entry : ENTRIES) {
