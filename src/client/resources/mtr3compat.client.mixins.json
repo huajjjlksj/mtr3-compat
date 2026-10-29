@@ -15,6 +15,7 @@
 		"MatricesSetIdentityMixin",
 		"MinecraftReloadMixin",
 		"ModelJSClusterMixin",
+		"MtlDefaultTextureMixin",
 		"ModelPropertiesPartObjCopyMixin",
 	"PersistentVehicleDataAccessor",
 		"RailCompatMixin",
