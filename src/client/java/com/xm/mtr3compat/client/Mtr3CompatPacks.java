@@ -17,8 +17,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * 包发现：扫描原版 resourcepacks 目录下的 MTR 资源包（zip 或目录，含 assets/mtr/mtr_custom_resources.json），
- * 并直接读磁盘读取资源包文件。勾选（MTR3 模式）的包由 ResourceManagerHelperMixin 拦截 MTR4/JCM 解析。
+ * 包发现：扫描原版 resourcepacks 目录下的 MTR 资源包（zip 或目录，含 assets/mtr/mtr_custom_resources.json
+ * 或 NTE 轨道定义 assets/mtrsteamloco/rails/*.json），并直接读磁盘读取资源包文件。
+ * 勾选（MTR3 模式）的包由 ResourceManagerHelperMixin 拦截 MTR4/JCM 解析。
  */
 public final class Mtr3CompatPacks {
 
@@ -49,11 +50,11 @@ public final class Mtr3CompatPacks {
 		return result;
 	}
 
-	/** 全部 MTR 资源包（含 assets/mtr/mtr_custom_resources.json）。 */
+	/** 全部 MTR 资源包：含 assets/mtr/mtr_custom_resources.json（车型等），或含 NTE 轨道定义（assets/mtrsteamloco/rails/*.json，纯轨道包）。 */
 	public static ObjectArrayList<Path> mtrPacks() {
 		final ObjectArrayList<Path> result = new ObjectArrayList<>();
 		for (final Path path : packs()) {
-			if (readPackFile(path, "assets/mtr/mtr_custom_resources.json") != null) {
+			if (readPackFile(path, "assets/mtr/mtr_custom_resources.json") != null || !listPackFiles(path, "assets/mtrsteamloco/rails/", ".json").isEmpty()) {
 				result.add(path);
 			}
 		}

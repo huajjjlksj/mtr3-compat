@@ -78,7 +78,7 @@ public class Mtr3PackSelectScreen extends Screen {
 		guiGraphics.drawCenteredString(font, title, width / 2, 16, 0xFFFFFF);
 		guiGraphics.drawCenteredString(font, Component.literal("MTR3 = 该包由 mtr3-compat 接管（MTR4/JCM 不解析），需同时在原版资源包界面启用"), width / 2, 30, 0xAAAAAA);
 		if (packList.isEmpty()) {
-			guiGraphics.drawCenteredString(font, Component.literal("未在 resourcepacks 目录找到含 mtr_custom_resources.json 的资源包"), width / 2, 60, 0xFFAAAA);
+			guiGraphics.drawCenteredString(font, Component.literal("未在 resourcepacks 目录找到含 mtr_custom_resources.json 或 NTE 轨道定义的资源包"), width / 2, 60, 0xFFAAAA);
 		} else {
 			final int bottomRowY = height - 28;
 			final int perPage = Math.max(1, (bottomRowY - 8 - 52) / 24);
