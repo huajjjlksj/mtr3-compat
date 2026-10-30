@@ -17,6 +17,8 @@
 		"ModelJSClusterMixin",
 		"MtlDefaultTextureMixin",
 		"ModelPropertiesPartObjCopyMixin",
+		"Mtr3CompatDoorMapMixin",
+		"Mtr3CompatDoorRenderMixin",
 	"PersistentVehicleDataAccessor",
 		"RailCompatMixin",
 		"RoutePlatformIdsMixin",

@@ -539,8 +539,15 @@ public final class NativeTrainLoader {
 				// DoorAnimationType.getDoorAnimationZ 里按 flipped 自行取反，这里不能再取反，
 				// 否则镜像节（末节尤甚）门板会朝车端滑出 2 倍门宽。
 				final double worldDoorZMultiplier = (isObj ? -1 : 1) * doorZMultiplier;
-				partsObject.addProperty("doorXMultiplier", reversed ? -doorXMultiplier : doorXMultiplier);
-				partsObject.addProperty("doorZMultiplier", reversed ? -worldDoorZMultiplier : worldDoorZMultiplier);
+				// reversed 只对 OBJ 部件补偿；bbmodel 部件必须与上游一致，否则常规资源包的门会反向。
+				final double writtenDoorXMultiplier = isObj && reversed ? -doorXMultiplier : doorXMultiplier;
+				final double writtenDoorZMultiplier = isObj && reversed ? -worldDoorZMultiplier : worldDoorZMultiplier;
+				partsObject.addProperty("doorXMultiplier", writtenDoorXMultiplier);
+				partsObject.addProperty("doorZMultiplier", writtenDoorZMultiplier);
+				if (writtenDoorXMultiplier != 0 || writtenDoorZMultiplier != 0) {
+					// 标记旧版门部件，供 LegacyDoorMap 统一同一门洞槽位上的多层门扇绑定。
+					partsObject.getAsJsonArray("names").add(LegacyDoorMap.MARKER);
+				}
 
 				final String positionDefinitionName = "definition_" + Init.randomString();
 				final JsonArray positionDefinitionPositionsArray = new JsonArray();

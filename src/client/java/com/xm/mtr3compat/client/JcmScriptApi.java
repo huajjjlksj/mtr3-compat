@@ -1,7 +1,6 @@
 package com.xm.mtr3compat.client;
 
 import com.lx862.mtrscripting.core.ScriptManager;
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
@@ -34,36 +33,15 @@ public final class JcmScriptApi {
 
 	/**
 	 * 是否需要本模组补入列车级脚本入口（createTrain / renderTrain / disposeTrain）。
-	 * 2.3.0-beta.* 原生就收集这三个函数，再注入会让同一函数在一帧内被调用多次；
-	 * 2.3.0-prerelease 起移除原生支持，才需要补丁。版本按 mod 版本号判断，而不是按事件泛型签名。
+	 * JCM 只按名字收集 create / render / dispose 三个函数（见 RhinoParsedScript.parse），
+	 * 从不识别 createTrain 系列，因此只要新版解析事件可用就必须补入；
+	 * 补入前会检查函数是否已在列表中，重复补入不会造成一帧多调。
 	 */
 	public static boolean needsTrainScriptEntries() {
 		if (trainScriptEntries == null) {
-			trainScriptEntries = mtr3compat$detectTrainScriptEntries();
-			if (!trainScriptEntries) {
-				Mtr3CompatClient.LOGGER.info("[mtr3compat] JCM {} 自带列车级脚本入口，跳过注入", jcmVersion());
-			}
+			trainScriptEntries = supportsParsedScriptListener();
 		}
 		return trainScriptEntries;
-	}
-
-	private static boolean mtr3compat$detectTrainScriptEntries() {
-		if (!supportsParsedScriptListener()) {
-			// 旧签名（TriConsumer）拿不到 ParsedScript 实例，本来就无法补入
-			return false;
-		}
-		return !jcmVersion().contains("-beta");
-	}
-
-	private static String jcmVersion() {
-		try {
-			return FabricLoader.getInstance().getModContainer("jsblock")
-					.map(container -> container.getMetadata().getVersion().getFriendlyString())
-					.orElse("");
-		} catch (Throwable ignored) {
-			// 拿不到版本时按新版处理，保持 prerelease 的功能可用
-			return "";
-		}
 	}
 
 	private static boolean mtr3compat$detect() {
