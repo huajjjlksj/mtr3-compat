@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "org.mtr.mod.resource",
+	"compatibilityLevel": "JAVA_17",
+	"mixins": [
+		"Mtr3CompatPartDetailsMixin",
+		"Mtr3CompatDoorRenderMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

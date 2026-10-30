@@ -535,9 +535,10 @@ public final class NativeTrainLoader {
 							break;
 					}
 				}
-				// 门板滑出方向必须与几何镜像一致：objOffset 已把 OBJ 几何沿 z 镜像过
-				// （非翻转 z 取负、翻转 z 保持），动画项在世界系里不会自动跟随，因此同样按 flip 取反。
-				final double worldDoorZMultiplier = objOffset ? (flipPositions ? doorZMultiplier : -doorZMultiplier) : (isObj ? -1 : 1) * doorZMultiplier;
+				// 门板滑出方向只看资源的 door_offset：镜像几何的滑出方向已由 MTR4 在
+				// DoorAnimationType.getDoorAnimationZ 里按 flipped 自行取反，这里不能再取反，
+				// 否则镜像节（末节尤甚）门板会朝车端滑出 2 倍门宽。
+				final double worldDoorZMultiplier = (isObj ? -1 : 1) * doorZMultiplier;
 				partsObject.addProperty("doorXMultiplier", reversed ? -doorXMultiplier : doorXMultiplier);
 				partsObject.addProperty("doorZMultiplier", reversed ? -worldDoorZMultiplier : worldDoorZMultiplier);
 
@@ -562,6 +563,14 @@ public final class NativeTrainLoader {
 				processPositions(propertiesPartsObject, "positions_flipped", reversed, true, flipPositionsFlipped, positionDefinitionPositionsFlippedArray, objOffset);
 
 				addSingleArrayItem(partsObject, "positionDefinitions", positionDefinitionName);
+
+				if (objOffset && Mtr3CompatClient.LOGGER.isInfoEnabled()) {
+					Mtr3CompatClient.LOGGER.info("[gen-probe] car={}/{} rev={} name={} wl={} mirror={} doorZ={} pos={} posF={}",
+							currentCar, totalCars, reversed,
+							propertiesPartsObject.has("name") ? tryGet(propertiesPartsObject, "name") : tryGet(propertiesPartsObject, "part_name"),
+							tryGet(propertiesPartsObject, "whitelisted_cars"), mirror, worldDoorZMultiplier,
+							positionDefinitionPositionsArray, positionDefinitionPositionsFlippedArray);
+				}
 			}
 		});
 	}

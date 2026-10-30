@@ -19,6 +19,10 @@
 		{
 			"config": "mtr3compat.client.mixins.json",
 			"environment": "client"
+		},
+		{
+			"config": "mtr3compat.mtr.mixins.json",
+			"environment": "client"
 		}
 	],
 	"depends": {
