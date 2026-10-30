@@ -37,15 +37,21 @@ public final class LegacyDoorMap {
 		}
 
 		final Field namesField = getField(part.getClass(), "names");
-		if (namesField == null) {
+		final Field doorXField = getField(part.getClass(), "doorXMultiplier");
+		final Field doorZField = getField(part.getClass(), "doorZMultiplier");
+		if (namesField == null || doorXField == null || doorZField == null) {
 			return;
 		}
 
+		final double partDoorXMultiplier;
+		final double partDoorZMultiplier;
 		try {
 			final Object names = namesField.get(part);
 			if (!(names instanceof ObjectArrayList) || !((ObjectArrayList<?>) names).contains(MARKER)) {
 				return;
 			}
+			partDoorXMultiplier = (Double) doorXField.get(part);
+			partDoorZMultiplier = (Double) doorZField.get(part);
 		} catch (Exception ignored) {
 			return;
 		}
@@ -75,7 +81,9 @@ public final class LegacyDoorMap {
 
 					final double centerX = (box.getMinXMapped() + box.getMaxXMapped()) / 2;
 					final int side = centerX < 0 ? -1 : centerX > 0 ? 1 : 0;
-					final String key = side + "|" + x + "|" + y + "|" + z + "|" + flipped;
+					// 分组键必须带门偏移量：同一门洞的两片门扇朝相反方向滑出（door_offset 不同），
+					// 不能与同一门洞的内外层混为一组，否则会把本来正确的门扇挪到隔壁门洞。
+					final String key = side + "|" + partDoorXMultiplier + "|" + partDoorZMultiplier + "|" + x + "|" + y + "|" + z + "|" + flipped;
 					final Group group = groups.computeIfAbsent(key, ignored -> new Group());
 					group.members.add(partDetails);
 
@@ -133,6 +141,29 @@ public final class LegacyDoorMap {
 				return null;
 			}
 		});
+	}
+
+	/**
+	 * 判断是否为旧版资源包注册的 OBJ 门部件（names 中含标记名）。
+	 *
+	 * @param part ModelPropertiesPart 实例
+	 */
+	public static boolean hasMarker(Object part) {
+		if (part == null) {
+			return false;
+		}
+
+		final Field namesField = getField(part.getClass(), "names");
+		if (namesField == null) {
+			return false;
+		}
+
+		try {
+			final Object names = namesField.get(part);
+			return names instanceof ObjectArrayList && ((ObjectArrayList<?>) names).contains(MARKER);
+		} catch (Exception ignored) {
+			return false;
+		}
 	}
 
 	private static final class Group {
