@@ -550,9 +550,14 @@ public final class NativeTrainLoader {
 				positionDefinitionObject.add("positionsFlipped", reversed ? positionDefinitionPositionsArray : positionDefinitionPositionsFlippedArray);
 				positionDefinitionsArray.add(positionDefinitionObject);
 
-				// 车厢位移修复：OBJ 部件的坐标需按 flipped 做镜像（非翻转 z 取负、翻转 x 取负），
-				// 使 MTR4 烘焙的 Rx(180) 与资源包原始朝向上台；翻转条目在 positionsFlipped 中
-				// 还会被 iteratePositions 对 x 取负，故存 -x。
+				// 从一手源码推导 OBJ 部件的等价变换（对任意资源包成立，而非拟合单个包）：
+				//   NTE 装载期烘焙（DynamicTrainModelLoader L250-265）：非镜像 v' = v + t3；镜像 v' = Ry(π)·v + (-x,0,z)。
+				//   NTE 渲染（SowcerModelAgent L25-32）：world = M · Rx(π) · v'。
+				//   MTR4 装载（ObjModelLoader 烘焙 Rx(π)）+ addTransformation：world = M · Ry(π·flip) · (Rx(π)·v + t4)。
+				// 令两式恒等：
+				//   非镜像（flip=false）：Rx(π)v + Rx(π)t3 = Rx(π)v + t4   → t4 = (x, 0, -z)
+				//   镜像  （flip=true） ：Rx(π)Ry(π)v + Rx(π)(-x,0,z) = Ry(π)(Rx(π)v + t4) → Ry(π)t4 = (-x,0,-z) → t4 = (x, 0, z)
+				// 即 z 仅在未翻转时取负；翻转条目在 positionsFlipped 中还会被 iteratePositions 对 x 取负，故存 -x。
 				processPositions(propertiesPartsObject, "positions", reversed, mirror, flipPositions, mirror ? positionDefinitionPositionsFlippedArray : positionDefinitionPositionsArray, objOffset);
 				processPositions(propertiesPartsObject, "positions_flipped", reversed, true, flipPositionsFlipped, positionDefinitionPositionsFlippedArray, objOffset);
 
