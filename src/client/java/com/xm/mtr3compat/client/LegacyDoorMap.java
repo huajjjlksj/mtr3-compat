@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 旧版资源包的门扇常由内外两片组成（同一门洞槽位、同一门偏移）。
@@ -21,8 +22,8 @@ public final class LegacyDoorMap {
 	public static final String MARKER = "mtr3compat$door";
 
 	private static final Map<Object, Map<String, Group>> GROUPS = Collections.synchronizedMap(new WeakHashMap<>());
-	private static final Map<Class<?>, Field> NAMES_FIELDS = Collections.synchronizedMap(new WeakHashMap<>());
 	private static final Map<Class<?>, Field[]> PART_FIELDS = Collections.synchronizedMap(new WeakHashMap<>());
+	private static final Map<String, Field> NAMED_FIELDS = new ConcurrentHashMap<>();
 
 	/**
 	 * 在 {@code ModelPropertiesPart.mapDoors} 之后调用。
@@ -105,19 +106,30 @@ public final class LegacyDoorMap {
 	}
 
 	private static Field getField(Class<?> targetClass, String name) {
-		return NAMES_FIELDS.computeIfAbsent(targetClass, key -> {
-			Class<?> current = key;
-			while (current != null) {
-				try {
-					final Field field = current.getDeclaredField(name);
-					field.setAccessible(true);
-					return field;
-				} catch (Exception ignored) {
-					current = current.getSuperclass();
-				}
+		return getNamedField(targetClass, name);
+	}
+
+	/** 按「类 + 字段名」缓存的反射读取（MTR4 同一类上可能有多个待读字段）。 */
+	private static Field getNamedField(Class<?> targetClass, String name) {
+		final String cacheKey = targetClass.getName() + "#" + name;
+		final Field cached = NAMED_FIELDS.get(cacheKey);
+		if (cached != null) {
+			return cached;
+		}
+		Field result = null;
+		Class<?> current = targetClass;
+		while (current != null && result == null) {
+			try {
+				result = current.getDeclaredField(name);
+				result.setAccessible(true);
+			} catch (Exception ignored) {
+				current = current.getSuperclass();
 			}
-			return null;
-		});
+		}
+		if (result != null) {
+			NAMED_FIELDS.put(cacheKey, result);
+		}
+		return result;
 	}
 
 	/**
