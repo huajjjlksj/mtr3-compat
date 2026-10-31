@@ -431,11 +431,19 @@ public final class NativeTrainLoader {
 					case "DOORS_OPEN":
 					case "DOORS_LEFT_OPEN":
 					case "DOORS_RIGHT_OPEN":
+					case "DOOR_OPEN":
+					case "DOOR_LEFT_OPEN":
+					case "DOOR_RIGHT_OPEN":
 						renderCondition = "DOORS_OPENED";
 						break;
+					// 旧版的单数写法同样合法（按左侧/右侧车门各自判断），MTR4 只有全局开门条件，
+					// 这里与复数一致地映射到 DOORS_OPENED / DOORS_CLOSED，避免关门层与开门层同时渲染。
 					case "DOORS_CLOSED":
 					case "DOORS_LEFT_CLOSED":
 					case "DOORS_RIGHT_CLOSED":
+					case "DOOR_CLOSED":
+					case "DOOR_LEFT_CLOSED":
+					case "DOOR_RIGHT_CLOSED":
 						renderCondition = "DOORS_CLOSED";
 						break;
 					case "MOVING_FORWARDS":

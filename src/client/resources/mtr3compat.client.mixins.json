@@ -29,6 +29,7 @@
 		"VehicleConfigCaptureMixin",
 		"VehicleScriptContextConnMixin",
                 "VehicleScriptCarSpaceShiftMixin",
+		"VehicleWrapperSideSwapMixin",
 		"VehicleRailIndexMixin",
 		"VehicleConnModelMixin",
 		"VehicleDoorValueMixin",

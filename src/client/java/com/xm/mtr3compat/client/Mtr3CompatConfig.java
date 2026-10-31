@@ -24,11 +24,16 @@ import java.util.Set;
  *   "mtr3_packs": ["包名（不含 .zip）", ...],
  *   "script_car_offsets": {
  *     "包名（不含 .zip）": { "x": 0, "y": 0, "z": -2.5 }
+ *   },
+ *   "script_lr_swap": {
+ *     "车型 id 或包名（不含 .zip）": true
  *   }
  * }
  * </pre>
  * mtr3_packs：被本 mod 拦截 MTR4/JCM 解析、改以 MTR3 模式加载的资源包。
  * script_car_offsets：按资源包给脚本“车厢空间”绘制加的平移量，x/y/z 任意组合、缺省为 0。
+ * script_lr_swap：按车型 id（或资源包名）让脚本看到的 isReversed 取反、
+ * doorLeftOpen/doorRightOpen 互换，用于修正脚本左右约定与车体不一致的资源包。
  * 文件被修改后 ≤0.5 秒内自动生效，无需重载资源包或重启游戏。
  */
 public final class Mtr3CompatConfig {
@@ -36,6 +41,8 @@ public final class Mtr3CompatConfig {
 	private static final Set<String> MTR3_PACKS = new LinkedHashSet<>();
 	/** 包名（已归一化）-> 平移量 [x, y, z]。 */
 	private static final Map<String, float[]> SCRIPT_CAR_OFFSETS = new HashMap<>();
+	/** 小写的车型 id 或包名（已归一化）-> 是否启用脚本左右互换。 */
+	private static final Set<String> SCRIPT_LR_SWAP = new LinkedHashSet<>();
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final long RELOAD_INTERVAL_NANOS = 500_000_000L;
 
@@ -73,6 +80,15 @@ public final class Mtr3CompatConfig {
 			return null;
 		}
 		return offset;
+	}
+
+	/** 该车型（按 id）或所属资源包（按包名）是否启用脚本左右互换。 */
+	public static boolean scriptLrSwap(String vehicleId, String packName) {
+		reloadIfModified();
+		if (vehicleId != null && SCRIPT_LR_SWAP.contains(vehicleId.toLowerCase(Locale.ENGLISH))) {
+			return true;
+		}
+		return packName != null && SCRIPT_LR_SWAP.contains(normalize(packName).toLowerCase(Locale.ENGLISH));
 	}
 
 	public static void toggle(String packName) {
@@ -135,6 +151,17 @@ public final class Mtr3CompatConfig {
 					});
 				}
 			}
+			SCRIPT_LR_SWAP.clear();
+			if (object.has("script_lr_swap") && object.get("script_lr_swap").isJsonObject()) {
+				for (final Map.Entry<String, JsonElement> entry : object.getAsJsonObject("script_lr_swap").entrySet()) {
+					try {
+						if (entry.getValue().getAsBoolean()) {
+							SCRIPT_LR_SWAP.add(normalize(entry.getKey()).toLowerCase(Locale.ENGLISH));
+						}
+					} catch (Exception ignored) {
+					}
+				}
+			}
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] 读取配置失败", e);
 		}
@@ -165,6 +192,9 @@ public final class Mtr3CompatConfig {
 				offsets.add(pack, object);
 			});
 			root.add("script_car_offsets", offsets);
+			final JsonObject lrSwap = new JsonObject();
+			SCRIPT_LR_SWAP.forEach(key -> lrSwap.addProperty(key, true));
+			root.add("script_lr_swap", lrSwap);
 			Files.write(path, GSON.toJson(root).getBytes(StandardCharsets.UTF_8));
 			lastModified = Files.getLastModifiedTime(path).toMillis();
 		} catch (Exception e) {

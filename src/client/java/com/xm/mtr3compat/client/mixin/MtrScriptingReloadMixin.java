@@ -223,19 +223,7 @@ public class MtrScriptingReloadMixin {
 
 	/** 去掉 JsonArray 内的重复字符串条目，保持首次出现顺序。非字符串条目原样保留。 */
 	private static JsonArray mtr3compat$dedupIntraArray(JsonArray array) {
-		final JsonArray result = new JsonArray();
-		final java.util.Set<String> seen = new java.util.HashSet<>();
-		for (final JsonElement element : array) {
-			if (element.isJsonPrimitive()) {
-				final String value = element.getAsString();
-				if (seen.add(value)) {
-					result.add(element);
-				}
-			} else {
-				result.add(element);
-			}
-		}
-		return result;
+		return com.xm.mtr3compat.client.JcmScriptApi.dedupeArray(array);
 	}
 
 	private static String mtr3compat$scriptKey(JsonObject vehicleObject) {
