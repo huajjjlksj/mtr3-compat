@@ -1,5 +1,6 @@
 package com.xm.mtr3compat.client.mixin;
 
+import com.xm.mtr3compat.client.Mtr3ConfigScreen;
 import com.xm.mtr3compat.client.Mtr3PackSelectScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -13,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * MTR 设置面板右下角新增"以MTR3加载"按钮，打开按包勾选界面。
+ * MTR 设置面板右下角新增"以MTR3加载"按钮，其上方新增"本模组配置"按钮。
  */
 @Mixin(ConfigScreen.class)
 public class ConfigScreenMixin {
@@ -26,5 +27,8 @@ public class ConfigScreenMixin {
 		final ButtonWidgetExtension button = new ButtonWidgetExtension(self.getWidthMapped() - 161, self.getHeightMapped() - 30, 150, 20, "以MTR3加载",
 				b -> Minecraft.getInstance().setScreen(new Mtr3PackSelectScreen(vanilla)));
 		self.addChild(new ClickableWidget(button));
+		final ButtonWidgetExtension configButton = new ButtonWidgetExtension(self.getWidthMapped() - 161, self.getHeightMapped() - 54, 150, 20, "mtr3兼容mod配置",
+				b -> Minecraft.getInstance().setScreen(new Mtr3ConfigScreen(vanilla)));
+		self.addChild(new ClickableWidget(configButton));
 	}
 }

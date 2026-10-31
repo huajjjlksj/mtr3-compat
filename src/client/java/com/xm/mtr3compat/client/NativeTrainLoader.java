@@ -40,9 +40,17 @@ public final class NativeTrainLoader {
 	private static final ObjectArrayList<NativeEntry2> ENTRIES = new ObjectArrayList<>();
 	/** 原生注册的车型 id -> 来源资源包名（不含 .zip），供按包区分的渲染校正使用。 */
 	private static final java.util.HashMap<String, String> VEHICLE_PACK = new java.util.HashMap<>();
+	/** 原生注册的车型 id -> 显示名（配置界面用）。 */
+	private static final java.util.HashMap<String, String> VEHICLE_NAME = new java.util.HashMap<>();
 
 	public static String packOf(String vehicleId) {
 		return VEHICLE_PACK.get(vehicleId);
+	}
+
+	/** 车型显示名；未声明 name 时退回 id。 */
+	public static String nativeName(String vehicleId) {
+		final String name = VEHICLE_NAME.get(vehicleId);
+		return name == null || name.isEmpty() ? vehicleId : name;
 	}
 
 	/** 经启用中的资源包读取 OBJ/贴图/JSON（勾选包仍在原版正常启用，仅解析被拦截）。 */
@@ -115,6 +123,7 @@ public final class NativeTrainLoader {
 		NATIVE_IDS.clear();
 		ENTRIES.clear();
 		VEHICLE_PACK.clear();
+		VEHICLE_NAME.clear();
 		ModelCacheKeepAlive.clear();
 		JcmScriptAlias.invalidate();
 		// 只处理原版资源包管理器真正加载了的包：未启用的包贴图/脚本/JSON 一律读不到，
@@ -158,6 +167,7 @@ public final class NativeTrainLoader {
 	private static void addEntry(String pack, String id, JsonElement element) {
 		if (element.isJsonObject() && !id.isEmpty()) {
 			NATIVE_IDS.add(id);
+			VEHICLE_NAME.put(id, tryGet(element.getAsJsonObject(), "name"));
 			ENTRIES.add(new NativeEntry2(id, pack, element.getAsJsonObject()));
 		}
 	}

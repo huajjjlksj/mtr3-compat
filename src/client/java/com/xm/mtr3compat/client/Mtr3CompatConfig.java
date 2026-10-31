@@ -11,6 +11,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -69,32 +70,75 @@ public final class Mtr3CompatConfig {
 		return MTR3_PACKS;
 	}
 
-	/** 该资源包的脚本车厢空间平移量 [x, y, z]；未配置或全为 0 时返回 null。 */
-	public static float[] scriptCarOffset(String packName) {
-		if (packName == null) {
-			return null;
-		}
+	/** 配置键归一化：去掉 .zip 并转小写（车型 id 与包名共用同一套键）。 */
+	public static String key(String name) {
+		return name == null ? null : normalize(name).toLowerCase(Locale.ENGLISH);
+	}
+
+	/** 该车型（按 id）或所属资源包（按包名）的脚本车厢空间平移量 [x, y, z]；未配置或全为 0 时返回 null。 */
+	public static float[] scriptCarOffset(String vehicleId, String packName) {
 		reloadIfModified();
-		final float[] offset = SCRIPT_CAR_OFFSETS.get(normalize(packName));
+		float[] offset = vehicleId == null ? null : SCRIPT_CAR_OFFSETS.get(key(vehicleId));
+		if (offset == null && packName != null) {
+			offset = SCRIPT_CAR_OFFSETS.get(key(packName));
+		}
 		if (offset == null || (offset[0] == 0 && offset[1] == 0 && offset[2] == 0)) {
 			return null;
 		}
 		return offset;
 	}
 
+	public static float[] scriptCarOffset(String packName) {
+		return scriptCarOffset(null, packName);
+	}
+
 	/** 该车型（按 id）或所属资源包（按包名）是否启用脚本左右互换。 */
 	public static boolean scriptLrSwap(String vehicleId, String packName) {
 		reloadIfModified();
-		if (vehicleId != null && SCRIPT_LR_SWAP.contains(vehicleId.toLowerCase(Locale.ENGLISH))) {
+		if (vehicleId != null && SCRIPT_LR_SWAP.contains(key(vehicleId))) {
 			return true;
 		}
-		return packName != null && SCRIPT_LR_SWAP.contains(normalize(packName).toLowerCase(Locale.ENGLISH));
+		return packName != null && SCRIPT_LR_SWAP.contains(key(packName));
+	}
+
+	/** 左右互换配置的键集合（副本，键已小写）。 */
+	public static Set<String> getScriptLrSwapKeys() {
+		reloadIfModified();
+		return new LinkedHashSet<>(SCRIPT_LR_SWAP);
+	}
+
+	/** 车厢平移配置（副本）。 */
+	public static Map<String, float[]> getScriptCarOffsets() {
+		reloadIfModified();
+		return new HashMap<>(SCRIPT_CAR_OFFSETS);
+	}
+
+	/** 用界面草稿替换这些车型的左右互换设置（包名键保留）。 */
+	public static void applyVehicleLrSwap(Collection<String> allVehicleIds, Collection<String> enabled) {
+		for (final String id : allVehicleIds) {
+			SCRIPT_LR_SWAP.remove(key(id));
+		}
+		for (final String id : enabled) {
+			SCRIPT_LR_SWAP.add(key(id));
+		}
+		save();
+	}
+
+	/** 用界面草稿替换这些车型的车厢平移设置（包名键保留）。 */
+	public static void applyVehicleOffsets(Collection<String> allVehicleIds, Map<String, float[]> offsets) {
+		for (final String id : allVehicleIds) {
+			SCRIPT_CAR_OFFSETS.remove(key(id));
+		}
+		for (final Map.Entry<String, float[]> entry : offsets.entrySet()) {
+			SCRIPT_CAR_OFFSETS.put(key(entry.getKey()), entry.getValue());
+		}
+		save();
 	}
 
 	public static void toggle(String packName) {
-		final String key = normalize(packName);
-		if (!MTR3_PACKS.remove(key)) {
-			MTR3_PACKS.add(key);
+		final String packKey = normalize(packName);
+		if (!MTR3_PACKS.remove(packKey)) {
+			MTR3_PACKS.add(packKey);
 		}
 		save();
 	}
@@ -146,7 +190,7 @@ public final class Mtr3CompatConfig {
 						continue;
 					}
 					final JsonObject offset = entry.getValue().getAsJsonObject();
-					SCRIPT_CAR_OFFSETS.put(normalize(entry.getKey()), new float[]{
+					SCRIPT_CAR_OFFSETS.put(key(entry.getKey()), new float[]{
 							number(offset, "x"), number(offset, "y"), number(offset, "z")
 					});
 				}
@@ -156,7 +200,7 @@ public final class Mtr3CompatConfig {
 				for (final Map.Entry<String, JsonElement> entry : object.getAsJsonObject("script_lr_swap").entrySet()) {
 					try {
 						if (entry.getValue().getAsBoolean()) {
-							SCRIPT_LR_SWAP.add(normalize(entry.getKey()).toLowerCase(Locale.ENGLISH));
+							SCRIPT_LR_SWAP.add(key(entry.getKey()));
 						}
 					} catch (Exception ignored) {
 					}

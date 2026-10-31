@@ -42,7 +42,8 @@ public class VehicleScriptCarSpaceShiftMixin {
 			return;
 		}
 		try {
-			final float[] offset = Mtr3CompatConfig.scriptCarOffset(NativeTrainLoader.packOf(vehicleIdOf(carIndex)));
+			final String vehicleId = vehicleIdOf(carIndex);
+			final float[] offset = Mtr3CompatConfig.scriptCarOffset(vehicleId, NativeTrainLoader.packOf(vehicleId));
 			if (offset == null) {
 				return;
 			}

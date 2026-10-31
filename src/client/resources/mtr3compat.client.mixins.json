@@ -33,6 +33,7 @@
 		"VehicleRailIndexMixin",
 		"VehicleConnModelMixin",
 		"VehicleDoorValueMixin",
+		"VehicleNextStopIndexMixin",
 		"VehicleRouteStopsMixin",
 		"VectorToStringMixin",
 		"ScriptResourceUtilMixin",
