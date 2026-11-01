@@ -2,7 +2,6 @@ package com.xm.mtr3compat.client.mixin;
 
 import com.lx862.mtrscripting.mod.impl.mtr.vehicle.VehicleScriptContext;
 import com.lx862.mtrscripting.mod.impl.mtr.vehicle.VehicleWrapper;
-import com.xm.mtr3compat.client.Mtr3CompatClient;
 import org.mtr.mod.data.VehicleExtension;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -24,7 +23,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class StopsDataStickyMixin {
 
 	private static final Map<Long, VehicleWrapper.StopsData> STICKY = new ConcurrentHashMap<>();
-	private static final Map<Long, String> LAST_LOG = new ConcurrentHashMap<>();
 
 	@Inject(method = "constructData", at = @At("RETURN"), cancellable = true)
 	private static void mtr3compat$stickyStops(VehicleScriptContext.DataFetchMode mode, VehicleExtension vehicle,
@@ -45,11 +43,6 @@ public class StopsDataStickyMixin {
 		}
 		if (result != null) {
 			com.xm.mtr3compat.client.ante.Mtr3StationExitCompat.ensureStops(result);
-			final String signature = result.isFullData + "/" + result.allStops.size() + "/" + result.routeToRun.size();
-			if (!signature.equals(LAST_LOG.put(id, signature))) {
-				Mtr3CompatClient.LOGGER.info("[mtr3compat] stops#{} full={} stops={} routes={}",
-						id, result.isFullData, result.allStops.size(), result.routeToRun.size());
-			}
 		}
 	}
 }

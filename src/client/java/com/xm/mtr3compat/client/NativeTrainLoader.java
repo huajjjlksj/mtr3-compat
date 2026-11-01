@@ -21,7 +21,6 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 /**
  * MTR3 原生加载路径：勾选（MTR3 模式）的 resourcepacks 资源包中 custom_trains 条目
@@ -383,32 +382,51 @@ public final class NativeTrainLoader {
 					.replace("_barrier", "");
 		}
 
+		// 风挡只在每节车的首个模型（车体）上挂贴图，其余模型留空。
+		// MTR3 的贯通道是"每节车画一次"（TrainClient.simulateCar 里用 prev↔this 一对端点，与车体模型数量无关），
+		// 而 MTR4 的 RenderVehicles 按 modelIndex 逐车缓存"上一节车的端点"。legacy 的 model 字段用 %N 过滤，
+		// 车头/车尾车比中间车多出 lf.obj / lb.obj，这些索引上的端点永远停留在整列车首/尾，于是画出贯穿整列车的
+		// 拉伸四边形。每个车都有首个模型，故只在 index 0 画，等价于 MTR3 的每车一次；其余模型贴图为空，
+		// MTR4 的 scheduleRender 会直接跳过。
 		final JsonObject modelPropertiesObject = new JsonObject();
-		modelPropertiesObject.addProperty("modelYOffset", 1);
-		if (hasVisibleGangway) {
-			modelPropertiesObject.addProperty("gangwayInnerSideResource", gangwayConnectionBaseId + "_side.png");
-			modelPropertiesObject.addProperty("gangwayInnerTopResource", gangwayConnectionBaseId + "_roof.png");
-			modelPropertiesObject.addProperty("gangwayInnerBottomResource", gangwayConnectionBaseId + "_floor.png");
-			modelPropertiesObject.addProperty("gangwayOuterSideResource", gangwayConnectionBaseId + "_exterior.png");
-			modelPropertiesObject.addProperty("gangwayOuterTopResource", gangwayConnectionBaseId + "_exterior.png");
-			modelPropertiesObject.addProperty("gangwayOuterBottomResource", gangwayConnectionBaseId + "_exterior.png");
-			modelPropertiesObject.addProperty("gangwayWidth", 1.5);
-			modelPropertiesObject.addProperty("gangwayHeight", 2.25);
-			modelPropertiesObject.addProperty("gangwayYOffset", 1);
-			modelPropertiesObject.addProperty("gangwayZOffset", 0.5);
+		final JsonObject gangwayModelPropertiesObject = new JsonObject();
+		for (final JsonObject target : new JsonObject[]{modelPropertiesObject, gangwayModelPropertiesObject}) {
+			target.addProperty("modelYOffset", 1);
+			target.addProperty("barrierInnerSideResource", barrierBaseId + "_exterior.png");
+			target.addProperty("barrierOuterSideResource", barrierBaseId + "_exterior.png");
+			target.addProperty("barrierWidth", 2.25);
+			target.addProperty("barrierHeight", 1);
+			target.addProperty("barrierYOffset", 1.25);
+			target.addProperty("barrierZOffset", 0.25);
+			target.add("parts", partsArray);
 		}
-		modelPropertiesObject.addProperty("barrierInnerSideResource", barrierBaseId + "_exterior.png");
-		modelPropertiesObject.addProperty("barrierOuterSideResource", barrierBaseId + "_exterior.png");
-		modelPropertiesObject.addProperty("barrierWidth", 2.25);
-		modelPropertiesObject.addProperty("barrierHeight", 1);
-		modelPropertiesObject.addProperty("barrierYOffset", 1.25);
-		modelPropertiesObject.addProperty("barrierZOffset", 0.25);
-		modelPropertiesObject.add("parts", partsArray);
+		if (hasVisibleGangway) {
+			gangwayModelPropertiesObject.addProperty("gangwayInnerSideResource", gangwayConnectionBaseId + "_side.png");
+			gangwayModelPropertiesObject.addProperty("gangwayInnerTopResource", gangwayConnectionBaseId + "_roof.png");
+			gangwayModelPropertiesObject.addProperty("gangwayInnerBottomResource", gangwayConnectionBaseId + "_floor.png");
+			gangwayModelPropertiesObject.addProperty("gangwayOuterSideResource", gangwayConnectionBaseId + "_exterior.png");
+			gangwayModelPropertiesObject.addProperty("gangwayOuterTopResource", gangwayConnectionBaseId + "_exterior.png");
+			gangwayModelPropertiesObject.addProperty("gangwayOuterBottomResource", gangwayConnectionBaseId + "_exterior.png");
+			gangwayModelPropertiesObject.addProperty("gangwayWidth", 1.5);
+			gangwayModelPropertiesObject.addProperty("gangwayHeight", 2.25);
+			gangwayModelPropertiesObject.addProperty("gangwayYOffset", 1);
+			gangwayModelPropertiesObject.addProperty("gangwayZOffset", 0.5);
+		}
 
 		final JsonObject positionDefinitionsObject = new JsonObject();
 		positionDefinitionsObject.add("positionDefinitions", positionDefinitionsArray);
 		Mtr3CompatClient.LOGGER.info("[mtr3compat] {} car={}/{} models={} parts={} posDefs={}", id, currentCar, totalCars, modelObjects.size(), partsArray.size(), positionDefinitionsArray.size());
-		return modelObjects.stream().map(modelObject -> new VehicleModel(new JsonReader(modelObject), new JsonReader(modelPropertiesObject), new JsonReader(positionDefinitionsObject), id, RESOURCE_PROVIDER)).collect(Collectors.toCollection(ObjectArrayList::new));
+		final ObjectArrayList<VehicleModel> models = new ObjectArrayList<>();
+		for (int i = 0; i < modelObjects.size(); i++) {
+			models.add(new VehicleModel(
+					new JsonReader(modelObjects.get(i)),
+					new JsonReader(i == 0 ? gangwayModelPropertiesObject : modelPropertiesObject),
+					new JsonReader(positionDefinitionsObject),
+					id,
+					RESOURCE_PROVIDER
+			));
+		}
+		return models;
 	}
 
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
@@ -416,6 +434,18 @@ public final class NativeTrainLoader {
 	private static final double LENGTH_EXTRA = 1;
 	/** 车钩间隙：间距已由 length 的 +1 补齐，不再额外加 padding（否则车体会比模型短 1 格而重叠）。 */
 	private static final double COUPLING_PADDING = 0;
+
+	/**
+	 * 旧版 OBJ 部件用 "文件.obj/组名" 指定几何所在的 OBJ 组（NTE 写法，允许一个属性文件跨多个 OBJ）；
+	 * MTR4 的 OBJ 模型按单个组名 token 索引几何，不带文件名前缀，故这里只保留组名。
+	 */
+	private static String legacyObjPartName(String name, boolean isObj) {
+		if (!isObj) {
+			return name;
+		}
+		final int index = name.lastIndexOf(".obj/");
+		return index < 0 ? name : name.substring(index + ".obj/".length());
+	}
 
 	private static void processModel(LegacyEntry legacy, String id, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
 		propertiesPartsArray.forEach(jsonElement -> {
@@ -427,11 +457,9 @@ public final class NativeTrainLoader {
 				final JsonObject partsObject = new JsonObject();
 				partsArray.add(partsObject);
 
-				if (propertiesPartsObject.has("name")) {
-					addSingleArrayItem(partsObject, "names", tryGet(propertiesPartsObject, "name"));
-				} else {
-					addSingleArrayItem(partsObject, "names", tryGet(propertiesPartsObject, "part_name"));
-				}
+				addSingleArrayItem(partsObject, "names", legacyObjPartName(propertiesPartsObject.has("name")
+						? tryGet(propertiesPartsObject, "name")
+						: tryGet(propertiesPartsObject, "part_name"), isObj));
 
 				partsObject.addProperty("renderStage", tryGet(propertiesPartsObject, "stage").toUpperCase(Locale.ENGLISH));
 				partsObject.addProperty("doorAnimationType", legacy.doorAnimationType());
@@ -588,14 +616,6 @@ public final class NativeTrainLoader {
 				processPositions(propertiesPartsObject, "positions_flipped", reversed, true, flipPositionsFlipped, positionDefinitionPositionsFlippedArray, objOffset);
 
 				addSingleArrayItem(partsObject, "positionDefinitions", positionDefinitionName);
-
-				if (objOffset && Mtr3CompatClient.LOGGER.isInfoEnabled()) {
-					Mtr3CompatClient.LOGGER.info("[gen-probe] car={}/{} rev={} name={} wl={} mirror={} doorZ={} pos={} posF={}",
-							currentCar, totalCars, reversed,
-							propertiesPartsObject.has("name") ? tryGet(propertiesPartsObject, "name") : tryGet(propertiesPartsObject, "part_name"),
-							tryGet(propertiesPartsObject, "whitelisted_cars"), mirror, worldDoorZMultiplier,
-							positionDefinitionPositionsArray, positionDefinitionPositionsFlippedArray);
-				}
 			}
 		});
 	}
