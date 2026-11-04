@@ -1,6 +1,7 @@
 package com.xm.mtr3compat.client.mixin;
 
 import com.xm.mtr3compat.client.Mtr3CompatClient;
+import com.xm.mtr3compat.client.Mtr3CompatConfig;
 import com.xm.mtr3compat.client.NativeTrainLoader;
 import org.mtr.core.data.TransportMode;
 import org.mtr.mod.client.CustomResourceLoader;
@@ -30,10 +31,13 @@ public class CustomResourceLoaderMixin {
 				trainCount[0], CustomResourceLoader.getRails().size(), NativeTrainLoader.countNative());
 	}
 
-	/** 抑制 mtr3-compat 包经 LegacyVehicleResource 生成的 4 变体注册。 */
+	/**
+	 * MTR4 车辆加载开关关闭时，MTR4 自身注册的车辆（内置车辆与资源包转换出的变体）一律不注册，
+	 * 只保留本模组原生注册的车型。开关打开（默认）时两者混合加载。
+	 */
 	@Inject(method = "registerVehicle(Lorg/mtr/mod/resource/VehicleResource;Z)V", at = @At("HEAD"), cancellable = true)
-	private static void mtr3compat$suppressVariants(VehicleResource vehicleResource, boolean fromResourcePackCreator, CallbackInfo ci) {
-		if (NativeTrainLoader.shouldSuppress(vehicleResource.getId())) {
+	private static void mtr3compat$filterMtr4Vehicles(VehicleResource vehicleResource, boolean fromResourcePackCreator, CallbackInfo ci) {
+		if (!Mtr3CompatConfig.isMtr4Vehicles() && !NativeTrainLoader.isNative(vehicleResource.getId())) {
 			ci.cancel();
 		}
 	}

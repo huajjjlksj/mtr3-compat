@@ -21,6 +21,8 @@ import java.util.Set;
  * config/mtr3-compat.json：
  * <pre>
  * {
+ *   "auto_consist": true,
+ *   "mtr4_vehicles": true,
  *   "mtr3_packs": ["包名（不含 .zip）", ...],
  *   "script_car_offsets": {
  *     "包名（不含 .zip）": { "x": 0, "y": 0, "z": -2.5 }
@@ -31,6 +33,11 @@ import java.util.Set;
  * }
  * </pre>
  * mtr3_packs：被本 mod 拦截 MTR4/JCM 解析、改以 MTR3 模式加载的资源包。
+ * auto_consist：MTR3 式自动编组开关，默认开启。两种模式的本模组与 MTR4 车型都会照常注册、渲染，
+ * 只在选车列表里做显示过滤（已选用的车型始终保留）：开启时隐藏 MTR4 的车头/车厢/车尾变体，
+ * 关闭时隐藏本模组注册的单车厢条目。切换不需要重载资源包。
+ * mtr4_vehicles：是否加载 MTR4 自身的车辆（内置车辆与资源包转换出的变体），默认开启（混合加载）。
+ * 关闭后 MTR4 不再注册任何车辆，选车列表只留本模组注册的车型；切换需要重载资源包。
  * script_car_offsets：按资源包给脚本“车厢空间”绘制加的平移量，x/y/z 任意组合、缺省为 0。
  * script_lr_swap：按车型 id（或资源包名）让脚本看到的 isReversed 取反、
  * doorLeftOpen/doorRightOpen 互换，用于修正脚本左右约定与车体不一致的资源包。
@@ -40,6 +47,12 @@ public final class Mtr3CompatConfig {
 
 	/** 配置目录（gameDir/config），由 loader 引导类在 {@link Mtr3CompatClient#init()} 前注入。 */
 	public static java.nio.file.Path configDir;
+
+	/** MTR3 式自动编组开关，默认开启。 */
+	private static boolean autoConsist = true;
+
+	/** 是否加载 MTR4 自身的车辆，默认开启（混合加载）；关闭时只保留本模组注册的车型。 */
+	private static boolean mtr4Vehicles = true;
 
 	private static final Set<String> MTR3_PACKS = new LinkedHashSet<>();
 	/** 包名（已归一化）-> 平移量 [x, y, z]。 */
@@ -62,6 +75,28 @@ public final class Mtr3CompatConfig {
 
 	public static boolean isIntercepted(String packName) {
 		return MTR3_PACKS.contains(normalize(packName));
+	}
+
+	/** MTR3 式自动编组是否开启（默认开启）。 */
+	public static boolean isAutoConsist() {
+		reloadIfModified();
+		return autoConsist;
+	}
+
+	public static void setAutoConsist(boolean value) {
+		autoConsist = value;
+		save();
+	}
+
+	/** 是否加载 MTR4 自身的车辆（默认开启）。 */
+	public static boolean isMtr4Vehicles() {
+		reloadIfModified();
+		return mtr4Vehicles;
+	}
+
+	public static void setMtr4Vehicles(boolean value) {
+		mtr4Vehicles = value;
+		save();
 	}
 
 	public static boolean hasIntercepted() {
@@ -179,6 +214,8 @@ public final class Mtr3CompatConfig {
 				return;
 			}
 			final JsonObject object = root.getAsJsonObject();
+			autoConsist = !object.has("auto_consist") || object.get("auto_consist").getAsBoolean();
+			mtr4Vehicles = !object.has("mtr4_vehicles") || object.get("mtr4_vehicles").getAsBoolean();
 			if (object.has("mtr3_packs")) {
 				MTR3_PACKS.clear();
 				for (final JsonElement element : object.getAsJsonArray("mtr3_packs")) {
@@ -226,6 +263,8 @@ public final class Mtr3CompatConfig {
 			final Path path = file();
 			Files.createDirectories(path.getParent());
 			final JsonObject root = new JsonObject();
+			root.addProperty("auto_consist", autoConsist);
+			root.addProperty("mtr4_vehicles", mtr4Vehicles);
 			final JsonArray packs = new JsonArray();
 			MTR3_PACKS.forEach(packs::add);
 			root.add("mtr3_packs", packs);

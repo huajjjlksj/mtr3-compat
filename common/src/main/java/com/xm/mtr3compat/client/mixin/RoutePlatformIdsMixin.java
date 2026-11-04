@@ -3,21 +3,25 @@ package com.xm.mtr3compat.client.mixin;
 import com.xm.mtr3compat.client.jcm.Mtr3RoutePlatformIds;
 import org.mtr.core.data.Route;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.Unique;
 
 /**
  * MTR3 脚本按 {@code route.platformIds} 读取站台列表，MTR4 只有 getRoutePlatforms()。
- * 这里给 Route 补一个同名公有字段，值是惰性委托列表，脚本无需改动。
+ * 这里补一个公有 getter，Rhino 的属性访问会命中它（同 {@code route.name} 走 getName()）。
+ * <p>
+ * 不用「公有字段 + 构造器注入」的原因同 {@link SimplifiedRoutePlatformIdsMixin}：
+ * Fabric 打包会把 {@code "<init>*"} 展开成单一构造器签名，反序列化路径的实例字段恒为 null。
  */
 @Mixin(value = Route.class, remap = false)
 public class RoutePlatformIdsMixin {
 
-	public Mtr3RoutePlatformIds platformIds;
+	@Unique
+	private Mtr3RoutePlatformIds mtr3compat$platformIds;
 
-	@Inject(method = "<init>*", at = @At("TAIL"), require = 0)
-	private void mtr3compat$initPlatformIds(CallbackInfo ci) {
-		platformIds = new Mtr3RoutePlatformIds(this);
+	public Mtr3RoutePlatformIds getPlatformIds() {
+		if (mtr3compat$platformIds == null) {
+			mtr3compat$platformIds = new Mtr3RoutePlatformIds((Object) this);
+		}
+		return mtr3compat$platformIds;
 	}
 }

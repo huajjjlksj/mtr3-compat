@@ -9,9 +9,6 @@ public final class Mtr3CompatClient {
 	public static final String MOD_ID = "mtr3compat";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-	/** MTR3 自动编组开关（车辆选择面板顶部按钮切换）；默认开启，与 MTR3 选择车型后自动按轨长铺满一致。 */
-	public static boolean autoConsist = true;
-
 	/**
 	 * 勾选包脚本解析窗口内为 true：ScriptResourceUtilMixin 据此把 getMTRVersion() 伪装为 3.2.2，
 	 * 并让 parseScriptEvent 监听把全局 MTRClientData 换为带 DATA_CACHE 的替身（MtrClientDataCompat）。
