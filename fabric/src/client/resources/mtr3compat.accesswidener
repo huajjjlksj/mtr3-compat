@@ -1,0 +1,4 @@
+accessWidener	v2	named
+
+# 让非 Screen 子类（如原版资源包界面 Mixin）也能往界面添加控件
+accessible	method	net/minecraft/client/gui/screens/Screen	addRenderableWidget	(Lnet/minecraft/client/gui/components/events/GuiEventListener;)Lnet/minecraft/client/gui/components/events/GuiEventListener;

@@ -1,0 +1,13 @@
+plugins {
+    id 'java-library'
+}
+
+// This module contains loader-agnostic source code shared between fabric and forge.
+// It is not compiled independently; sources are included via srcDir in each loader module.
+
+sourceSets {
+    main {
+        java { srcDirs = [] }
+        resources { srcDirs = [] }
+    }
+}

@@ -1,0 +1,39 @@
+modLoader = "javafml"
+loaderVersion = "[47,)"
+license = "MIT"
+issueTrackerURL = ""
+
+[[mods]]
+modId = "mtr3compat"
+version = "${version}"
+displayName = "MTR3 Compat (Forge)"
+description = '''MTR4 兼容层：加载 MTR3 + NTE 资源包，提供 MTR3 式自动编组与 NTE JS 脚本引擎（Forge 版）。'''
+authors = "chenxin"
+
+[[dependencies.mtr3compat]]
+modId = "forge"
+mandatory = true
+versionRange = "[47,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.mtr3compat]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[1.20.1,1.20.2)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.mtr3compat]]
+modId = "mtr"
+mandatory = true
+versionRange = "[4.0.5,)"
+ordering = "AFTER"
+side = "CLIENT"
+
+[[dependencies.mtr3compat]]
+modId = "jsblock"
+mandatory = true
+versionRange = "[2.3.0-beta.2,)"
+ordering = "AFTER"
+side = "CLIENT"

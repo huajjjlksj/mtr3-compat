@@ -1,0 +1,97 @@
+plugins {
+	id 'net.minecraftforge.gradle' version '6.0.+'
+	id 'org.spongepowered.mixin' version '0.7.+'
+}
+
+base {
+	archivesName = 'mtr3-compat-forge'
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+	withSourcesJar()
+}
+
+minecraft {
+	mappings channel: 'official', version: project.minecraft_version
+	accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+	runs {
+		client {
+			workingDirectory project.file('run')
+			property 'forge.logging.console.level', 'debug'
+			property 'mixin.debug.export', 'true'
+			mods {
+				mtr3compat { source sourceSets.main }
+			}
+		}
+	}
+}
+
+repositories {
+	// 本地 maven 布局（fg.deobf 需要带元数据的仓库，flatDir/files 均不可靠）
+	maven {
+		url = uri('libs-maven')
+	}
+}
+
+dependencies {
+	minecraft "net.minecraftforge:forge:${project.minecraft_version}-${project.forge_version}"
+
+	// MTR4 + JCM 的 Forge 版：fg.deobf 在开发期反混淆为 official 命名
+	compileOnly fg.deobf("com.xm.local:mtr-forge:4.0.5+1.20.1")
+	runtimeOnly fg.deobf("com.xm.local:mtr-forge:4.0.5+1.20.1")
+	compileOnly fg.deobf("com.xm.local:jcm-forge:2.3.0-beta.2+1.20.1")
+	runtimeOnly fg.deobf("com.xm.local:jcm-forge:2.3.0-beta.2+1.20.1")
+
+	annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+mixin {
+	add sourceSets.main, 'mtr3compat.refmap.json'
+	config 'mtr3compat.client.mixins.json'
+	debug.verbose = true
+	debug.export = true
+}
+
+// common 模块为加载器无关源码真相：以 srcDir 方式并入 main 源集编译
+sourceSets {
+	main {
+		java {
+			srcDir project(':common').file('src/main/java')
+		}
+		resources {
+			srcDir project(':common').file('src/main/resources')
+		}
+	}
+}
+
+processResources {
+	inputs.property "version", project.version
+	filesMatching("META-INF/mods.toml") {
+		expand "version": project.version
+	}
+	// mixin json 来自 common，Forge 侧需注入 "refmap" 字段（fabric 侧 loom-remap 模式不需要）
+	filesMatching("mtr3compat.client.mixins.json") {
+		filter { line ->
+			line.replace(
+				'"compatibilityLevel": "JAVA_17",',
+				'"compatibilityLevel": "JAVA_17",\n\t"refmap": "mtr3compat.refmap.json",'
+			)
+		}
+	}
+}
+
+jar {
+	manifest {
+		attributes([
+			"Specification-Title"     : "mtr3compat",
+			"Specification-Vendor"    : "chenxin",
+			"Specification-Version"   : "1",
+			"Implementation-Title"    : project.name,
+			"Implementation-Version"  : project.version,
+			"Implementation-Vendor"   : "chenxin"
+		])
+	}
+}

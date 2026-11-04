@@ -1,0 +1,7 @@
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.xm.local</groupId>
+  <artifactId>mtr-forge</artifactId>
+  <version>4.0.5+1.20.1</version>
+  <packaging>jar</packaging>
+</project>

@@ -1,0 +1,19 @@
+subprojects {
+    apply plugin: 'java'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+        withSourcesJar()
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    // 源码含中文注释，统一按 UTF-8 编译（FG 默认取平台编码 GBK 会报不可映射字符）
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+}
