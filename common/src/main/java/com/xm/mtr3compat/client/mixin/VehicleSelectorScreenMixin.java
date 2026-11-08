@@ -3,11 +3,13 @@ package com.xm.mtr3compat.client.mixin;
 import com.xm.mtr3compat.client.AutoConsist;
 import com.xm.mtr3compat.client.NativeTrainLoader;
 import org.mtr.core.data.Siding;
+import org.mtr.core.data.TransportMode;
 import org.mtr.core.data.VehicleCar;
 import org.mtr.core.operation.UpdateDataRequest;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectImmutableList;
 import org.mtr.mod.InitClient;
+import org.mtr.mod.client.CustomResourceLoader;
 import org.mtr.mod.client.MinecraftClientData;
 import org.mtr.mod.packet.PacketUpdateData;
 import org.mtr.mod.resource.VehicleResource;
@@ -19,9 +21,11 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.reflect.Field;
+import java.util.function.Consumer;
 
 /**
  * 选车列表：
@@ -42,6 +46,23 @@ public abstract class VehicleSelectorScreenMixin {
 	private static Field mtr3compat$allDataField;
 	/** 选车列表里每项都对应一个 VehicleResource（私有内部类字段）。 */
 	private static Field mtr3compat$vehicleResourceField;
+	/** DashboardList 排序后的数据列表（悬停索引即其下标）。 */
+	private static Field mtr3compat$dataSortedField;
+
+	/**
+	 * 左侧车型介绍按“悬停下标”从 CustomResourceLoader 的全量车型表取车，
+	 * 而本模组把可选用列表过滤过（下标已错位），这里改为按当前列表项取车，保证介绍与悬停项一致。
+	 */
+	@Redirect(method = "renderAdditional(Lorg/mtr/mapping/mapper/GraphicsHolder;IIF)V",
+			at = @At(value = "INVOKE", target = "Lorg/mtr/mod/client/CustomResourceLoader;getVehicleByIndex(Lorg/mtr/core/data/TransportMode;ILjava/util/function/Consumer;)V"))
+	private void mtr3compat$previewHoveredVehicle(TransportMode transportMode, int index, Consumer<VehicleResource> consumer) {
+		final VehicleResource resource = mtr3compat$resourceAtIndex(index);
+		if (resource == null) {
+			CustomResourceLoader.getVehicleByIndex(transportMode, index, consumer);
+		} else {
+			consumer.accept(resource);
+		}
+	}
 
 	@Inject(method = "updateList()V", at = @At("TAIL"))
 	private void mtr3compat$autoConsist(CallbackInfo ci) {
@@ -97,6 +118,11 @@ public abstract class VehicleSelectorScreenMixin {
 	}
 
 	private static String mtr3compat$vehicleId(DashboardListItem item) {
+		final VehicleResource resource = mtr3compat$vehicleResource(item);
+		return resource == null ? null : resource.getId();
+	}
+
+	private static VehicleResource mtr3compat$vehicleResource(DashboardListItem item) {
 		try {
 			Field field = mtr3compat$vehicleResourceField;
 			if (field == null) {
@@ -105,7 +131,29 @@ public abstract class VehicleSelectorScreenMixin {
 				mtr3compat$vehicleResourceField = field;
 			}
 			final Object resource = field.get(item);
-			return resource instanceof VehicleResource ? ((VehicleResource) resource).getId() : null;
+			return resource instanceof VehicleResource ? (VehicleResource) resource : null;
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private VehicleResource mtr3compat$resourceAtIndex(int index) {
+		try {
+			final Field listField = mtr3compat$getDataSortedField();
+			final Field availableListField = mtr3compat$getAvailableListField();
+			if (listField == null || availableListField == null) {
+				return null;
+			}
+			final DashboardList availableList = (DashboardList) availableListField.get(this);
+			if (availableList == null) {
+				return null;
+			}
+			final ObjectArrayList<DashboardListItem> sorted = (ObjectArrayList<DashboardListItem>) listField.get(availableList);
+			if (sorted == null || index < 0 || index >= sorted.size()) {
+				return null;
+			}
+			return mtr3compat$vehicleResource(sorted.get(index));
 		} catch (Exception e) {
 			return null;
 		}
@@ -123,6 +171,19 @@ public abstract class VehicleSelectorScreenMixin {
 			mtr3compat$allDataField = mtr3compat$findField("allData");
 		}
 		return mtr3compat$allDataField;
+	}
+
+	private static Field mtr3compat$getDataSortedField() {
+		if (mtr3compat$dataSortedField == null) {
+			try {
+				final Field field = DashboardList.class.getDeclaredField("dataSorted");
+				field.setAccessible(true);
+				mtr3compat$dataSortedField = field;
+			} catch (Exception e) {
+				return null;
+			}
+		}
+		return mtr3compat$dataSortedField;
 	}
 
 	private static Field mtr3compat$findField(String name) {
