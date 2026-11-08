@@ -15,6 +15,7 @@
 		"MatricesSetIdentityMixin",
 		"MinecraftReloadMixin",
 		"ModelJSClusterMixin",
+		"ModelResourceLoaderCacheMixin",
 		"ModelPropertiesPartObjCopyMixin",
 		"Mtr3CompatDoorMapMixin",
 		"Mtr3CompatDoorRenderMixin",

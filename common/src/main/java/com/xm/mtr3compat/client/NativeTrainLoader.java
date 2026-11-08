@@ -55,6 +55,11 @@ public final class NativeTrainLoader {
 		return VEHICLE_PACK.get(vehicleId);
 	}
 
+	/** 是否为本模组为勾选（MTR3 模式）资源包提供的 ResourceProvider（用于区分解析缓存的作用范围）。 */
+	public static boolean isNativeResourceProvider(ResourceProvider provider) {
+		return provider == RESOURCE_PROVIDER;
+	}
+
 	public static String nativeName(String vehicleId) {
 		final String name = VEHICLE_NAME.get(vehicleId);
 		return name == null || name.isEmpty() ? vehicleId : name;
@@ -130,6 +135,7 @@ public final class NativeTrainLoader {
 		ENTRIES.clear();
 		VEHICLE_PACK.clear();
 		VEHICLE_NAME.clear();
+		ModelCache.clear();
 		JcmScriptAlias.invalidate();
 		// 只处理原版资源包管理器真正加载了的包：未启用的包贴图/脚本/JSON 一律读不到，
 		// 注册出来只会造成 "Script ... is missing" 与 null 配置报错。
@@ -482,13 +488,18 @@ public final class NativeTrainLoader {
 		Mtr3CompatClient.LOGGER.info("[mtr3compat] {} car={}/{} models={} parts={} posDefs={}", id, currentCar, totalCars, modelObjects.size(), partsArray.size(), positionDefinitionsArray.size());
 		final ObjectArrayList<VehicleModel> models = new ObjectArrayList<>();
 		for (int i = 0; i < modelObjects.size(); i++) {
-			models.add(new VehicleModel(
-					new JsonReader(modelObjects.get(i)),
-					new JsonReader(i == 0 ? gangwayModelPropertiesObject : modelPropertiesObject),
+			final JsonObject modelObject = modelObjects.get(i);
+			final JsonObject modelPropertiesForModel = i == 0 ? gangwayModelPropertiesObject : modelPropertiesObject;
+			// 注意：每节车厢必须用自己的 VehicleModel（DynamicVehicleModel 的 map 会被消费后清空）
+			final VehicleModel vehicleModel = new VehicleModel(
+					new JsonReader(modelObject),
+					new JsonReader(modelPropertiesForModel),
 					new JsonReader(positionDefinitionsObject),
 					id,
 					RESOURCE_PROVIDER
-			));
+			);
+			ModelCache.disableExpiry(vehicleModel);
+			models.add(vehicleModel);
 		}
 		return models;
 	}
