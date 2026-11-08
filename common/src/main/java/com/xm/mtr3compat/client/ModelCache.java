@@ -73,8 +73,8 @@ public final class ModelCache {
 		PARSED.put(key, new HashMap<>(models));
 	}
 
-	/** 复制一个共享 rawMeshes、独立 rawModel 的 ObjModel。 */
-	private static OptimizedModel.ObjModel copyObjModel(OptimizedModel.ObjModel source) {
+	/** 复制一个共享 rawMeshes、独立 rawModel 的 ObjModel（供合批烘焙使用）。 */
+	public static OptimizedModel.ObjModel copyObjModel(OptimizedModel.ObjModel source) {
 		try {
 			if (objModelConstructor == null) {
 				objModelConstructor = OptimizedModel.ObjModel.class.getDeclaredConstructor(List.class, boolean.class, float.class, float.class, float.class, float.class, float.class, float.class);

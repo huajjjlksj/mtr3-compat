@@ -16,6 +16,7 @@
 		"MinecraftReloadMixin",
 		"ModelJSClusterMixin",
 		"ModelResourceLoaderCacheMixin",
+		"NativeVehicleRenderMixin",
 		"ModelPropertiesPartObjCopyMixin",
 		"Mtr3CompatDoorMapMixin",
 		"Mtr3CompatDoorRenderMixin",

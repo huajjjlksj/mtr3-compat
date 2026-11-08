@@ -38,6 +38,10 @@ public final class NativeTrainLoader {
 	private static final String[] LEGACY_GANGWAYS = {"a_train", "e44", "k_train_ael", "k_train", "k_train_tcl", "m_train", "r211", "s_train", "sp1900"};
 	private static final String[] LEGACY_BARRIERS = {"london_underground_d78", "mlr", "r179"};
 
+	/** 合批烘焙元数据字段：keepAll 生成的部件里记录原始 whitelisted/blacklisted_cars 过滤条件。 */
+	public static final String META_WHITELIST = "mtr3compatWhitelist";
+	public static final String META_BLACKLIST = "mtr3compatBlacklist";
+
 	private static final ObjectOpenHashSet<String> NATIVE_IDS = new ObjectOpenHashSet<>();
 	/** 条目声明了 model/贴图/属性，但已启用资源包里实际不存在这些文件：无法渲染，故不注册（选车列表里也不会出现）。 */
 	private static final ObjectOpenHashSet<String> BROKEN_IDS = new ObjectOpenHashSet<>();
@@ -90,6 +94,11 @@ public final class NativeTrainLoader {
 	private NativeTrainLoader() {
 	}
 
+	/** 供合批烘焙复用同一份资源读取器（同样经过 .mtl 贴图回退处理）。 */
+	static ResourceProvider resourceProvider() {
+		return RESOURCE_PROVIDER;
+	}
+
 	private static final class NativeEntry2 {
 		private final String id;
 		private final String pack;
@@ -136,6 +145,7 @@ public final class NativeTrainLoader {
 		VEHICLE_PACK.clear();
 		VEHICLE_NAME.clear();
 		ModelCache.clear();
+		NativeVehicleRenderer.clear();
 		JcmScriptAlias.invalidate();
 		// 只处理原版资源包管理器真正加载了的包：未启用的包贴图/脚本/JSON 一律读不到，
 		// 注册出来只会造成 "Script ... is missing" 与 null 配置报错。
@@ -303,6 +313,7 @@ public final class NativeTrainLoader {
 
 		final double finalDoorMax = doorMax;
 		Mtr3CompatClient.LOGGER.info("[mtr3compat] 注册原生车型 {} length={} width={} doorMax={} model={}", entry.id, length, width, doorMax, legacy.model());
+		NativeVehicleRenderer.buildPlan(entry.id, legacy, propertiesObject, finalDoorMax);
 		registerVehicle.accept(new VehicleResource(new JsonReader(baseObject),
 				(currentCar, totalCars) -> buildModels(legacy, propertiesObject, finalDoorMax, currentCar, totalCars, entry.id),
 				RESOURCE_PROVIDER));
@@ -429,10 +440,14 @@ public final class NativeTrainLoader {
 		final JsonArray partsArray = new JsonArray();
 
 		try {
-			processModel(legacy, currentCar, totalCars, isObj, reversed, propertiesObject.getAsJsonArray("parts"), positionDefinitionsArray, partsArray, doorMax);
+			processModel(legacy, currentCar, totalCars, isObj, reversed, propertiesObject.getAsJsonArray("parts"), positionDefinitionsArray, partsArray, doorMax, false);
 		} catch (Exception e) {
 			Mtr3CompatClient.LOGGER.warn("[mtr3compat] processModel 失败: {} car={}/{}", id, currentCar, totalCars, e);
 		}
+
+		// 合批渲染：静态（非门、非显示/地板/门洞）部件已由 NativeVehicleRenderer 一次性烘焙，
+		// 这里只保留仍需逐节构建的部件（门、显示、地板、门洞），避免每节车重复复制巨型 OBJ 网格。
+		final JsonArray usedPartsArray = NativeVehicleRenderer.isBatchable(id) ? filterBatchedParts(partsArray) : partsArray;
 
 		// Migrate legacy gangway & barriers
 		// has_gangway_connection=true 且 gangway_connection_id 为空的车型，MTR3 里靠模型几何画风挡；
@@ -468,7 +483,7 @@ public final class NativeTrainLoader {
 			target.addProperty("barrierHeight", 1);
 			target.addProperty("barrierYOffset", 1.25);
 			target.addProperty("barrierZOffset", 0.25);
-			target.add("parts", partsArray);
+			target.add("parts", usedPartsArray);
 		}
 		if (hasVisibleGangway) {
 			gangwayModelPropertiesObject.addProperty("gangwayInnerSideResource", gangwayConnectionBaseId + "_side.png");
@@ -485,7 +500,7 @@ public final class NativeTrainLoader {
 
 		final JsonObject positionDefinitionsObject = new JsonObject();
 		positionDefinitionsObject.add("positionDefinitions", positionDefinitionsArray);
-		Mtr3CompatClient.LOGGER.info("[mtr3compat] {} car={}/{} models={} parts={} posDefs={}", id, currentCar, totalCars, modelObjects.size(), partsArray.size(), positionDefinitionsArray.size());
+		Mtr3CompatClient.LOGGER.info("[mtr3compat] {} car={}/{} models={} parts={} (batched={}) posDefs={}", id, currentCar, totalCars, modelObjects.size(), usedPartsArray.size(), partsArray.size() - usedPartsArray.size(), positionDefinitionsArray.size());
 		final ObjectArrayList<VehicleModel> models = new ObjectArrayList<>();
 		for (int i = 0; i < modelObjects.size(); i++) {
 			final JsonObject modelObject = modelObjects.get(i);
@@ -505,6 +520,24 @@ public final class NativeTrainLoader {
 	}
 
 	/**
+	 * 合批模式下每节车只需保留仍需逐节构建的部件：显示、地板、门洞，以及会随门动画移动的 NORMAL 门部件。
+	 * 其余静态 NORMAL 部件由 {@link NativeVehicleRenderer} 一次性烘焙、渲染期按车过滤。
+	 */
+	private static JsonArray filterBatchedParts(JsonArray partsArray) {
+		final JsonArray result = new JsonArray();
+		for (final JsonElement element : partsArray) {
+			if (!element.isJsonObject()) {
+				continue;
+			}
+			final JsonObject part = element.getAsJsonObject();
+			if (!"NORMAL".equals(tryGet(part, "type")) || tryGetNumber(part, "doorXMultiplier") != 0 || tryGetNumber(part, "doorZMultiplier") != 0) {
+				result.add(part);
+			}
+		}
+		return result;
+	}
+
+	/**
 	 * 旧版 OBJ 部件用 “文件.obj/组名” 指定几何所在的 OBJ 组（NTE 写法，允许一个属性文件跨多个 OBJ）；
 	 * MTR4 的 OBJ 模型按单个组名索引几何，不带文件名前缀，故这里只保留组名。
 	 */
@@ -517,15 +550,20 @@ public final class NativeTrainLoader {
 	}
 
 	/** 复刻 LegacyVehicleResource.processModel（MTR3 只有单一 "parts" 数组，无 override）。 */
-	private static void processModel(LegacyEntry legacy, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax) {
+	static void processModel(LegacyEntry legacy, int currentCar, int totalCars, boolean isObj, boolean reversed, JsonArray propertiesPartsArray, JsonArray positionDefinitionsArray, JsonArray partsArray, double doorMax, boolean keepAll) {
 		propertiesPartsArray.forEach(jsonElement -> {
 			final JsonObject propertiesPartsObject = jsonElement.getAsJsonObject();
 			final String[] whitelistedCarsFilters = tryGet(propertiesPartsObject, "whitelisted_cars").split(",");
 			final String[] blacklistedCarsFilters = tryGet(propertiesPartsObject, "blacklisted_cars").split(",");
 
-			if (matchesFilter(blacklistedCarsFilters, currentCar, totalCars) <= matchesFilter(whitelistedCarsFilters, currentCar, totalCars)) {
+			if (keepAll || matchesFilter(blacklistedCarsFilters, currentCar, totalCars) <= matchesFilter(whitelistedCarsFilters, currentCar, totalCars)) {
 				final JsonObject partsObject = new JsonObject();
 				partsArray.add(partsObject);
+
+				if (keepAll) {
+					partsObject.addProperty(META_WHITELIST, String.join(",", whitelistedCarsFilters));
+					partsObject.addProperty(META_BLACKLIST, String.join(",", blacklistedCarsFilters));
+				}
 
 				addSingleArrayItem(partsObject, "names", legacyObjPartName(propertiesPartsObject.has("name")
 						? tryGet(propertiesPartsObject, "name")
@@ -699,7 +737,7 @@ public final class NativeTrainLoader {
 		jsonObject.add(property, jsonArray);
 	}
 
-	private static String tryGet(JsonObject jsonObject, String property) {
+	static String tryGet(JsonObject jsonObject, String property) {
 		try {
 			return jsonObject.get(property).getAsString();
 		} catch (Exception ignored) {
@@ -707,7 +745,7 @@ public final class NativeTrainLoader {
 		}
 	}
 
-	private static double tryGetNumber(JsonObject jsonObject, String property) {
+	static double tryGetNumber(JsonObject jsonObject, String property) {
 		try {
 			return jsonObject.get(property).getAsDouble();
 		} catch (Exception ignored) {
@@ -723,7 +761,7 @@ public final class NativeTrainLoader {
 		}
 	}
 
-	private static int matchesFilter(String[] filters, int currentCar, int totalCars) {
+	static int matchesFilter(String[] filters, int currentCar, int totalCars) {
 		int strength = filters.length == 0 ? 1 : 0;
 
 		for (final String filter : filters) {
@@ -753,7 +791,7 @@ public final class NativeTrainLoader {
 		return strength;
 	}
 
-	private static String[] splitWithEmptyStrings(String string, char token) {
+	static String[] splitWithEmptyStrings(String string, char token) {
 		final String filler = Init.randomString();
 		final String[] firstSplit = string.replace(String.valueOf(token), String.format("%1$s%2$s%1$s", filler, token)).split(("\\") + token);
 		final String[] finalSplit = new String[firstSplit.length];
